@@ -49,6 +49,11 @@ const App: React.FC = () => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
 
+      if (_event === 'SIGNED_IN') {
+        // On successful login, always redirect to the server selection page.
+        navigate('/select-server');
+      }
+
       if (!session) {
         setSelectedServer(null);
         localStorage.removeItem('lastSelectedServer');
