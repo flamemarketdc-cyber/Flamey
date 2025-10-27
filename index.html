@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Flamey Discord Bot</title>
+    <link rel="icon" type="image/png" href="https://media.discordapp.net/attachments/1409211763253051519/1431960946464653523/ChatGPT_Image_Oct_26__2025__03_09_04_PM-removebg.png?ex=68ff510e&is=68fdff8e&hm=6bfb1d8007bbbb8758d7f3bbbfc35a78d603e9455b3156289ac0342c6f95d021&=&format=webp&quality=lossless&width=842&height=842" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              'nexus-background': '#0A0F14',
+              'nexus-surface': '#111822', // Cards
+              'nexus-overlay': '#0E131A', // Navbar, Dropdowns
+              'nexus-sidebar-bg': '#0C1118',
+              'nexus-hover': 'rgba(0, 180, 255, 0.12)', // Sidebar active bg
+              'nexus-primary-text': '#EAF6FF',
+              'nexus-secondary-text': '#B0BECF',
+              'nexus-border': 'rgba(255, 255, 255, 0.05)',
+              'nexus-accent-primary': '#00B4FF',
+              'nexus-accent-glow': '#33C7FF', // Lighter hover accent
+              'nexus-success': '#4ADE80',
+              'nexus-danger': '#EF4444',
+              'nexus-accent-start': '#00B4FF',
+              'nexus-accent-end': '#33C7FF',
+            },
+            borderRadius: {
+              'xl': '12px',
+              '2xl': '16px',
+              '3xl': '20px',
+            },
+            keyframes: {
+               'fade-in-up': {
+                  '0%': { opacity: '0', transform: 'translateY(10px)' },
+                  '100%': { opacity: '1', transform: 'translateY(0)' },
+                },
+               'spin': {
+                  'from': { transform: 'rotate(0deg)' },
+                  'to': { transform: 'rotate(360deg)' },
+               },
+            },
+            animation: {
+              'fade-in-up': 'fade-in-up 0.5s ease-out forwards',
+              'spin': 'spin 1s linear infinite',
+            }
+          },
+        },
+      };
+    </script>
+    <style>
+      /* Basic reset for consistency */
+      body, html {
+        margin: 0;
+        padding: 0;
+        height: 100%;
+        font-family: 'Inter', sans-serif;
+        background-color: #0A0F14; /* nexus-background */
+        color: #EAF6FF; /* nexus-primary-text */
+        scroll-behavior: smooth;
+      }
+      #root {
+        height: 100%;
+      }
+      /* New fixed, subtle background glows */
+      body::before {
+        content: '';
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        background-image:
+          /* A more noticeable top glow */
+          radial-gradient(ellipse 60% 50% at 50% -10%, rgba(0, 180, 255, 0.2), transparent 70%),
+          /* A subtle bottom glow for ambience */
+          radial-gradient(ellipse 80% 50% at 50% 110%, rgba(0, 180, 255, 0.1), transparent 70%);
+        z-index: -1;
+        pointer-events: none;
+      }
+      .text-gradient-blue {
+        background: linear-gradient(to right, #00B4FF, #33C7FF);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        text-fill-color: transparent;
+      }
+
+      /* Hover glow effects */
+      .text-glow-blue {
+        transition: text-shadow 0.3s ease;
+      }
+      .text-glow-blue:hover {
+        text-shadow: 0 0 8px rgba(51, 199, 255, 0.5);
+      }
+      .text-glow-white {
+        transition: text-shadow 0.3s ease;
+      }
+      .text-glow-white:hover {
+         text-shadow: 0 0 8px rgba(234, 246, 255, 0.5);
+      }
+      
+      /* Letter hover effect */
+      .letter-hover {
+        display: inline-block;
+        transition: transform 0.2s ease-in-out;
+      }
+      h1 .letter-hover:hover {
+        transform: translateY(-5px) !important;
+      }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+    "@supabase/supabase-js": "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm",
+    "@supabase/gotrue-js": "https://aistudiocdn.com/@supabase/gotrue-js@^2.76.1",
+    "framer-motion": "https://aistudiocdn.com/framer-motion@^12.23.24"
+  }
+}
+</script>
+</head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
+  </body>
+</html>
