@@ -85,16 +85,19 @@ const App: React.FC = () => {
 
   // --- LOGIN HANDLER (FIXED) ---
   const handleLogin = async () => {
+    // Construct a clean redirect URL without any hash to prevent routing conflicts
+    // with the Supabase OAuth callback handler.
+    const redirectURL = `${window.location.origin}${window.location.pathname}`;
+
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'discord',
       options: {
-        // ✅ correct Discord scopes for bot dashboard + refresh token
         scopes: 'identify email guilds',
         queryParams: {
-          prompt: 'consent',       // forces showing consent dialog (refresh_token)
-          access_type: 'offline',  // request refresh token
+          prompt: 'consent',
+          access_type: 'offline',
         },
-        redirectTo: window.location.origin, // prevent hash issues
+        redirectTo: redirectURL,
       },
     });
 

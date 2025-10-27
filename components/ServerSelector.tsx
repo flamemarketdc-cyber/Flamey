@@ -84,9 +84,6 @@ const ServerSelector: React.FC<ServerSelectorProps> = ({ session, onServerSelect
             setBotGuildIds(new Set(cachedBotGuildIds));
             setLoading(false);
             loadingRef.current = false;
-            // We will still try to refresh data in the background, but for now, show cached.
-            // For this implementation, we will skip the background refresh to keep it simple.
-            // To add it, you'd remove this return and the loading setters, and make another API call.
             return;
         }
 
@@ -137,6 +134,8 @@ const ServerSelector: React.FC<ServerSelectorProps> = ({ session, onServerSelect
     fetchAndProcessGuilds();
   }, [session]);
 
+  const isAuthError = error && (error.toLowerCase().includes('authentication error') || error.toLowerCase().includes('discord connection expired'));
+
   return (
     <>
     <style>{`
@@ -173,14 +172,15 @@ const ServerSelector: React.FC<ServerSelectorProps> = ({ session, onServerSelect
 
             {error && (
                 <div className="flex-1 flex flex-col justify-center items-center text-center p-4">
-                    <p className="text-nexus-danger">{error}</p>
-                    {error.includes('Discord connection expired') && (
+                    <p className="font-semibold text-nexus-danger">An Error Occurred</p>
+                    <p className="text-nexus-secondary-text text-sm mt-1 max-w-sm">{error}</p>
+                    {isAuthError && (
                         <button
                             onClick={onLogin}
-                            className="flex items-center justify-center gap-2 px-5 py-2 mt-4 text-sm font-medium text-white bg-gradient-to-br from-nexus-accent-start to-nexus-accent-glow rounded-lg hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-nexus-accent-primary focus:ring-offset-nexus-background transition-all duration-200 hover:scale-105"
+                            className="flex items-center justify-center gap-2 px-5 py-2 mt-4 text-sm font-medium text-white bg-gradient-to-br from-nexus-accent-start to-nexus-accent-glow rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-nexus-accent-primary focus:ring-offset-nexus-background transition-all duration-300 hover:scale-105 hover:shadow-[0_0_15px_rgba(0,180,255,0.3)]"
                         >
                             <LogInIcon className="h-4 w-4" />
-                            <span>Login with Discord</span>
+                            <span>Re-authenticate with Discord</span>
                         </button>
                     )}
                 </div>
