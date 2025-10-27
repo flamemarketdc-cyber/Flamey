@@ -115,7 +115,8 @@ Deno.serve(async (req: Request) => {
             throw new Error('Authentication error: No Discord identity was found for your user account. Please log out and log back in using Discord.');
         }
         if (!identity.provider_token) {
-            throw new Error('Authentication error: Your Discord connection is missing required permissions. This can happen if the "guilds" scope was not approved. Please log out and try logging in again. When prompted by Discord, ensure you grant all requested permissions to Flamey.');
+            // UPDATED ERROR MESSAGE: This is a more helpful error. It tells the user exactly what's missing.
+            throw new Error('Authentication error: Flamey did not receive the required permission to see your servers. Please log out and log in again. When Discord asks for your approval, ensure the permission to "Access your servers" is listed and granted. If this issue persists, the application\'s core connection to Discord may need to be updated.');
         }
         if (!identity.provider_refresh_token) {
             throw new Error('Authentication error: A refresh token is missing. Please log out and log back in, ensuring you grant "offline access" to Flamey to maintain your session.');

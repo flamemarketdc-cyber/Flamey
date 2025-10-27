@@ -90,7 +90,11 @@ const App: React.FC = () => {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'discord',
       options: {
-        scopes: 'identify email guilds',
+        // Re-ordered scopes to put the most important one ('guilds') first.
+        // This makes our intent explicit and can help override default
+        // provider configurations that might otherwise omit the scope,
+        // which prevents the provider_token from being stored.
+        scopes: 'guilds identify email',
         // We ensure offline access is requested to get a refresh_token,
         // which allows the session to be maintained. 'consent' is used to
         // ensure the user re-approves permissions, fixing potential scope issues.
