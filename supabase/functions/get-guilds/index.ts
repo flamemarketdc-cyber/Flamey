@@ -35,15 +35,17 @@ Deno.serve(async (req: Request) => {
 
     const userId = await getUserIdFromRequest(req, supabaseClient);
 
-    // Create a service role client to securely access the auth schema
-    const serviceClient = createClient(supabaseUrl, serviceKey);
+    // ✅ FIX: Create a service role client configured to query the 'auth' schema directly.
+    const serviceClient = createClient(supabaseUrl, serviceKey, {
+        db: {
+            schema: 'auth'
+        }
+    });
     
     // Directly query the auth.identities table for the user's Discord provider_token.
-    // This is more reliable than relying on the session object.
     const { data: identity, error: identityError } = await serviceClient
-      .from('identities')
+      .from('identities') // This now correctly targets 'auth.identities'
       .select('provider_token')
-      .schema('auth') // ✅ FIX: Specify the 'auth' schema
       .eq('user_id', userId)
       .eq('provider', 'discord')
       .single();
