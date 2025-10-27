@@ -49,14 +49,11 @@ const App: React.FC = () => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
 
-      // Navigate automatically to select-server after login
-      if (session && window.location.hash.includes('access_token')) {
-        navigate('/select-server');
-      }
-
       if (!session) {
         setSelectedServer(null);
         localStorage.removeItem('lastSelectedServer');
+        // Clear all session storage on logout to prevent any stale cache
+        sessionStorage.clear();
         if (getHashRoute() !== '/') navigate('/');
       }
     });
@@ -85,14 +82,18 @@ const App: React.FC = () => {
 
   // --- LOGIN HANDLER (FIXED) ---
   const handleLogin = async () => {
-    // Construct a clean redirect URL without any hash to prevent routing conflicts
-    // with the Supabase OAuth callback handler.
-    const redirectURL = `${window.location.origin}${window.location.pathname}`;
+    // Redirect to a dedicated callback page to isolate the Supabase client's
+    // token processing from the main React app's lifecycle and routing.
+    // This provides a "clean room" for the auth hash to be processed reliably.
+    const redirectURL = `${window.location.origin}/callback.html`;
 
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'discord',
       options: {
         scopes: 'identify email guilds',
+        // We ensure offline access is requested to get a refresh_token,
+        // which allows the session to be maintained. 'consent' is used to
+        // ensure the user re-approves permissions, fixing potential scope issues.
         queryParams: {
           prompt: 'consent',
           access_type: 'offline',
@@ -108,10 +109,6 @@ const App: React.FC = () => {
 
   // --- LOGOUT HANDLER ---
   const handleLogout = async () => {
-    if (session) {
-      // Clear the session cache to prevent stale data for the next user
-      sessionStorage.removeItem(`guilds-cache-${session.user.id}`);
-    }
     const { error } = await supabase.auth.signOut();
     if (error) console.error('Error logging out:', error.message);
   };
