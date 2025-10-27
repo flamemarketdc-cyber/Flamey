@@ -16,8 +16,6 @@ interface DiscordTokenResponse {
   access_token: string;
   refresh_token: string;
   expires_in: number;
-  scope: string;
-  token_type: string;
 }
 
 // Function to refresh the Discord token
@@ -31,9 +29,7 @@ async function refreshDiscordToken(refreshToken: string): Promise<DiscordTokenRe
 
     const response = await fetch('https://discord.com/api/v10/oauth2/token', {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-        },
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: new URLSearchParams({
             client_id: DISCORD_CLIENT_ID,
             client_secret: DISCORD_CLIENT_SECRET,
@@ -53,16 +49,12 @@ async function refreshDiscordToken(refreshToken: string): Promise<DiscordTokenRe
 
 async function fetchDiscordGuilds(accessToken: string): Promise<any[]> {
     const discordResponse = await fetch('https://discord.com/api/users/@me/guilds', {
-        headers: {
-            Authorization: `Bearer ${accessToken}`,
-        },
+        headers: { Authorization: `Bearer ${accessToken}` },
     });
-
     if (!discordResponse.ok) {
         const errorResponse = { status: discordResponse.status, text: await discordResponse.text() };
         throw errorResponse;
     }
-
     return await discordResponse.json();
 }
 
@@ -82,29 +74,33 @@ Deno.serve(async (req: Request) => {
             throw new Error('Server configuration error: Missing Supabase environment variables.');
         }
 
-        // Client to get the user from their JWT
         const supabaseClient = createClient(supabaseUrl, anonKey, {
             global: { headers: { Authorization: req.headers.get('Authorization')! } },
         });
         const userId = await getUserIdFromRequest(req, supabaseClient);
-
-        // Service client to interact with our custom public table
         const serviceClient = createClient(supabaseUrl, serviceKey);
         
-        // 1. Fetch tokens from our new dedicated table
-        const { data: tokenData, error: tokenError } = await serviceClient
-            .from('user_discord_tokens')
-            .select('access_token, refresh_token')
-            .eq('id', userId)
+        // 1. Fetch the user's Discord identity directly from auth.identities as the source of truth
+        const { data: identity, error: identityError } = await serviceClient
+            .from('identities')
+            .select('identity_data')
+            .eq('user_id', userId)
+            .eq('provider', 'discord')
             .single();
 
-        if (tokenError || !tokenData) {
-            console.error('Token lookup database error:', tokenError);
-            throw new Error('Authentication error: Could not find your Discord credentials. Please try logging out and logging back in.');
+        if (identityError || !identity) {
+            console.error('Identity lookup error:', identityError);
+            throw new Error('Authentication error: Could not find your Discord identity. Please try logging out and back in.');
         }
 
-        let { access_token: accessToken, refresh_token: refreshToken } = tokenData;
+        const identityData = identity.identity_data as any;
+        let accessToken = identityData?.access_token;
+        let refreshToken = identityData?.refresh_token;
 
+        if (!accessToken || !refreshToken) {
+            throw new Error('Authentication error: Discord tokens are missing. Please re-authenticate.');
+        }
+        
         let guilds;
         try {
             // 2. Try fetching guilds with the current access token
@@ -115,25 +111,24 @@ Deno.serve(async (req: Request) => {
                 console.log('Access token expired for user. Refreshing...');
                 const newTokens = await refreshDiscordToken(refreshToken);
 
-                // 4. Update the tokens in our dedicated table
-                const { error: updateError } = await serviceClient
-                    .from('user_discord_tokens')
-                    .update({
-                        access_token: newTokens.access_token,
-                        refresh_token: newTokens.refresh_token,
-                        expires_at: new Date(Date.now() + newTokens.expires_in * 1000).toISOString(),
-                        updated_at: new Date().toISOString()
-                    })
-                    .eq('id', userId);
-
-                if (updateError) {
-                    console.error('Failed to update new tokens in database:', updateError);
-                    // Non-fatal, we can still proceed with the new token for this request
-                } else {
-                    console.log('Successfully updated tokens in database.');
-                }
+                // 4. Update both auth.identities and our public table with the new tokens
+                const newExpiresAt = new Date(Date.now() + newTokens.expires_in * 1000).toISOString();
                 
-                // 5. Retry fetching guilds with the new access token
+                // Update public table for resilience
+                await serviceClient.from('user_discord_tokens').upsert({
+                    id: userId,
+                    access_token: newTokens.access_token,
+                    refresh_token: newTokens.refresh_token,
+                    expires_at: newExpiresAt,
+                    updated_at: new Date().toISOString()
+                });
+
+                // Update auth.identities so it doesn't become stale
+                const newIdentityData = { ...identityData, ...newTokens, expires_in: newTokens.expires_in };
+                await serviceClient.from('identities').update({
+                    identity_data: newIdentityData
+                }).eq('user_id', userId).eq('provider', 'discord');
+                
                 accessToken = newTokens.access_token;
                 guilds = await fetchDiscordGuilds(accessToken);
                 
@@ -142,7 +137,7 @@ Deno.serve(async (req: Request) => {
             }
         }
         
-        // 6. Filter for guilds where the user has Admin permissions or is the owner
+        // 5. Filter for guilds where the user has Admin permissions or is the owner
         const manageableGuilds = guilds.filter((guild: any) => {
             try {
                 if (guild.owner === true) return true;
