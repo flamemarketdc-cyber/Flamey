@@ -97,7 +97,7 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({ session, onLogout, se
   }
 
   return (
-    <header className="fixed top-0 left-0 right-0 w-full h-16 bg-nexus-overlay/80 backdrop-blur-sm border-b border-white/5 z-30 flex items-center justify-between px-6 md:px-8">
+    <header className="fixed top-0 left-0 right-0 w-full h-16 bg-nexus-overlay/80 backdrop-blur-sm border-b border-white/5 z-30 flex items-center justify-between px-6 md:px-10 lg:px-12">
         {/* Left Side */}
         <div className="flex items-center gap-2 lg:w-64">
             <button onClick={onToggleSidebar} className="p-2 md:hidden text-nexus-secondary-text hover:text-nexus-primary-text">
@@ -252,7 +252,7 @@ const Dashboard: React.FC<DashboardProps> = ({ session, onLogout, server, onGoTo
                         .main-content::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
                         .main-content::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }
                     `}</style>
-                    <div className="max-w-6xl mx-auto px-6 md:px-8 py-10">
+                    <div className="max-w-6xl mx-auto px-6 md:px-10 lg:px-12 py-10">
                         <DashboardContent feature={activeFeature} server={server} />
                     </div>
                 </main>

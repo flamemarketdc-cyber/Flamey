@@ -218,7 +218,7 @@ const App: React.FC = () => {
         onDashboardClick={handleDashboardClick}
       />
       <main>
-        <Homepage onLogin={handleLogin} />
+        <Homepage />
       </main>
     </div>
   );

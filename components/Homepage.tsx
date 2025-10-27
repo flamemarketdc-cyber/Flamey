@@ -1,13 +1,9 @@
 import React from 'react';
-import { SwooshIcon, LogInIcon, ArrowRightIcon } from './icons/Icons';
+import { SwooshIcon, PlusIcon, ArrowRightIcon } from './icons/Icons';
 import TemplateCardGrid from './TemplateCardGrid';
 import Stats from './Stats';
 import Testimonials from './Testimonials';
 import Footer from './Footer';
-
-interface HomepageProps {
-  onLogin: () => void;
-}
 
 const AnimatedTitle = ({ text, gradientText }: { text: string; gradientText?: string }) => {
   const textToShow = gradientText ? text.replace(gradientText, '') : text;
@@ -39,7 +35,7 @@ const AnimatedTitle = ({ text, gradientText }: { text: string; gradientText?: st
 };
 
 
-const Homepage: React.FC<HomepageProps> = ({ onLogin }) => {
+const Homepage: React.FC = () => {
   return (
     <>
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 text-center pt-16 pb-16 sm:pt-24 sm:pb-24">
@@ -50,13 +46,15 @@ const Homepage: React.FC<HomepageProps> = ({ onLogin }) => {
           Robust moderation, engaging AI, and powerful tools to build your ultimate community.
         </p>
         <div className="mt-10 flex flex-col sm:flex-row justify-center items-center gap-4">
-          <button
-            onClick={onLogin}
+          <a
+            href="https://discord.com/oauth2/authorize?client_id=1430883691944738958&permissions=8&integration_type=0&scope=bot"
+            target="_blank"
+            rel="noopener noreferrer"
             className="group w-full sm:w-auto flex items-center justify-center gap-2.5 px-6 py-3 text-base font-semibold text-white bg-gradient-to-br from-nexus-accent-start to-nexus-accent-glow rounded-xl focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-nexus-accent-primary focus:ring-offset-nexus-background transition-all duration-300 hover:scale-105 hover:shadow-[0_0_20px_rgba(0,180,255,0.4)]"
           >
-            <LogInIcon className="h-5 w-5 transition-transform group-hover:scale-110" />
-            <span>Login with Discord</span>
-          </button>
+            <PlusIcon className="h-5 w-5 transition-transform group-hover:scale-110" />
+            <span>Add to Discord</span>
+          </a>
           <a
             href="#features"
             className="group w-full sm:w-auto flex items-center justify-center gap-2.5 px-6 py-3 text-base font-semibold text-nexus-secondary-text bg-transparent border border-white/10 rounded-xl hover:bg-white/5 hover:text-nexus-primary-text transition-all duration-300 hover:scale-105"
