@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { type Feature, DiscordGuild } from '../types';
 import { supabase } from '../lib/supabaseClient';
-import { SpinnerIcon, BotIcon, MessageSquareIcon, AtSignIcon, BookOpenIcon, SparklesIcon } from './icons/Icons';
+import { SpinnerIcon, BotIcon, MessageSquareIcon, AtSignIcon, BookOpenIcon, SparklesIcon, ChevronDownIcon } from './icons/Icons';
 
 const baseCardStyles = 'bg-nexus-surface border border-white/5 rounded-xl';
 const hoverCardStyles = 'hover:border-nexus-accent-primary/30';
@@ -20,12 +20,13 @@ const Title: React.FC<{ children: React.ReactNode }> = ({ children }) => (
     </div>
 );
 
-const ToggleSwitch: React.FC<{ enabled: boolean; onChange: (enabled: boolean) => void; label: string }> = ({ enabled, onChange, label }) => (
+const ToggleSwitch: React.FC<{ enabled: boolean; onChange: (enabled: boolean) => void; label: string, disabled?: boolean }> = ({ enabled, onChange, label, disabled = false }) => (
     <div className="flex items-center justify-between">
-        <span className="font-medium text-nexus-primary-text">{label}</span>
+        <span className={`font-medium text-nexus-primary-text transition-opacity ${disabled ? 'opacity-50' : ''}`}>{label}</span>
         <button
             onClick={() => onChange(!enabled)}
-            className={`relative inline-flex items-center h-7 rounded-full w-12 transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-nexus-accent-primary focus:ring-offset-nexus-surface ${enabled ? 'bg-nexus-accent-primary' : 'bg-white/10'}`}
+            disabled={disabled}
+            className={`relative inline-flex items-center h-7 rounded-full w-12 transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-nexus-accent-primary focus:ring-offset-nexus-surface ${enabled ? 'bg-nexus-accent-primary' : 'bg-white/10'} ${disabled ? 'cursor-not-allowed' : ''}`}
         >
             <span
                 className={`inline-block w-5 h-5 transform bg-white rounded-full transition-transform duration-300 ${enabled ? 'translate-x-6' : 'translate-x-1'}`}
@@ -228,27 +229,28 @@ const AIChatbotContent: React.FC<{ server: DiscordGuild }> = ({ server }) => {
     
     type Config = {
         enabled: boolean;
+        autoChannelEnabled: boolean;
         autoChannel: string | null;
         persona: string;
     };
     
     const { id: guildId } = server;
 
-    const [config, setConfig] = useState<Config>({ enabled: false, autoChannel: null, persona: '' });
-    const [initialConfig, setInitialConfig] = useState<Config>({ enabled: false, autoChannel: null, persona: '' });
+    const [config, setConfig] = useState<Config>({ enabled: false, autoChannelEnabled: false, autoChannel: null, persona: '' });
+    const [initialConfig, setInitialConfig] = useState<Config>({ enabled: false, autoChannelEnabled: false, autoChannel: null, persona: '' });
     const [channels, setChannels] = useState<{ id: string; name: string }[]>([]);
     const [status, setStatus] = useState<'loading' | 'saving' | 'success' | 'error' | 'idle'>('loading');
     const [error, setError] = useState('');
     const [channelError, setChannelError] = useState<string | null>(null);
 
+    const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+    const [channelSearch, setChannelSearch] = useState('');
+    const dropdownRef = useRef<HTMLDivElement>(null);
+
     useEffect(() => {
-        if (!guildId) {
-            return;
-        }
+        if (!guildId) return;
 
         const fetchData = async () => {
-            // Reset state and set to loading whenever the guildId changes.
-            // This prevents showing stale data from the previously selected server.
             setStatus('loading');
             setError('');
             setChannelError(null);
@@ -257,7 +259,7 @@ const AIChatbotContent: React.FC<{ server: DiscordGuild }> = ({ server }) => {
             try {
                 const [channelsResponse, configResponse] = await Promise.all([
                     supabase.functions.invoke('get-guild-channels', { body: { guildId } }),
-                    supabase.from('guild_configs').select('ai_chatbot_enabled, ai_chatbot_auto_channel, ai_chatbot_persona').eq('guild_id', guildId).single(),
+                    supabase.from('guild_configs').select('ai_chatbot_enabled, ai_chatbot_auto_channel, ai_chatbot_persona, ai_chatbot_auto_channel_enabled').eq('guild_id', guildId).single(),
                 ]);
 
                 const { data: channelsData, error: channelsInvokeError } = channelsResponse;
@@ -274,8 +276,9 @@ const AIChatbotContent: React.FC<{ server: DiscordGuild }> = ({ server }) => {
                     throw new Error(`Failed to load settings: ${configError.message}`);
                 }
 
-                const newConfig = {
+                const newConfig: Config = {
                     enabled: configData?.ai_chatbot_enabled ?? false,
+                    autoChannelEnabled: configData?.ai_chatbot_auto_channel_enabled ?? false,
                     autoChannel: configData?.ai_chatbot_auto_channel ?? null,
                     persona: configData?.ai_chatbot_persona ?? '',
                 };
@@ -290,6 +293,16 @@ const AIChatbotContent: React.FC<{ server: DiscordGuild }> = ({ server }) => {
         };
         fetchData();
     }, [guildId]);
+
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+                setIsDropdownOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
     
     const handleSave = async () => {
         setStatus('saving');
@@ -299,6 +312,7 @@ const AIChatbotContent: React.FC<{ server: DiscordGuild }> = ({ server }) => {
             .upsert({ 
                 guild_id: guildId, 
                 ai_chatbot_enabled: config.enabled,
+                ai_chatbot_auto_channel_enabled: config.autoChannelEnabled,
                 ai_chatbot_auto_channel: config.autoChannel,
                 ai_chatbot_persona: config.persona,
             });
@@ -314,6 +328,8 @@ const AIChatbotContent: React.FC<{ server: DiscordGuild }> = ({ server }) => {
     };
 
     const isUnchanged = JSON.stringify(config) === JSON.stringify(initialConfig);
+    const selectedChannel = channels.find(c => c.id === config.autoChannel);
+    const filteredChannels = channels.filter(c => c.name.toLowerCase().includes(channelSearch.toLowerCase()));
 
     if (status === 'loading') {
         return (
@@ -363,10 +379,61 @@ const AIChatbotContent: React.FC<{ server: DiscordGuild }> = ({ server }) => {
                                     </a>
                                 </div>
                             ) : (
-                                <select value={config.autoChannel ?? 'none'} onChange={(e) => setConfig(prev => ({...prev, autoChannel: e.target.value === 'none' ? null : e.target.value}))} className={formInputStyles} disabled={channels.length === 0}>
-                                    <option value="none">None</option>
-                                    {channels.length > 0 ? channels.map(channel => <option key={channel.id} value={channel.id}>#{channel.name}</option>) : <option disabled>No text channels found</option>}
-                                </select>
+                                <div className="space-y-4">
+                                    <ToggleSwitch 
+                                        label="Enable Auto-Response"
+                                        enabled={config.autoChannelEnabled}
+                                        onChange={(enabled) => setConfig(prev => ({ ...prev, autoChannelEnabled: enabled }))}
+                                        disabled={!!channelError || channels.length === 0}
+                                    />
+                                    <div className={`relative transition-opacity duration-300 ${config.autoChannelEnabled ? 'opacity-100' : 'opacity-50 pointer-events-none'}`} ref={dropdownRef}>
+                                        <button 
+                                            onClick={() => setIsDropdownOpen(!isDropdownOpen)} 
+                                            disabled={!!channelError || channels.length === 0} 
+                                            className={`${formInputStyles} flex items-center justify-between text-left`}
+                                        >
+                                            <span className={selectedChannel ? 'text-nexus-primary-text' : 'text-nexus-secondary-text/70'}>
+                                                {selectedChannel ? `# ${selectedChannel.name}` : 'Select a channel'}
+                                            </span>
+                                            <ChevronDownIcon className={`h-5 w-5 text-nexus-secondary-text transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
+                                        </button>
+                                        {isDropdownOpen && (
+                                            <div className="absolute top-full mt-2 w-full bg-nexus-overlay border border-white/10 rounded-lg shadow-2xl p-2 z-10 animate-fade-in-up">
+                                                <input 
+                                                    type="text" 
+                                                    placeholder="Search channels..." 
+                                                    value={channelSearch}
+                                                    onChange={(e) => setChannelSearch(e.target.value)}
+                                                    className="w-full bg-nexus-surface border-2 border-transparent rounded-md px-3 py-2 text-sm focus:ring-0 focus:border-nexus-accent-primary transition-colors mb-2"
+                                                />
+                                                <ul className="max-h-48 overflow-y-auto space-y-1 pr-1 server-list">
+                                                    <style>{`.server-list::-webkit-scrollbar { width: 6px; } .server-list::-webkit-scrollbar-track { background: transparent; } .server-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }`}</style>
+                                                    <li key="none">
+                                                        <button 
+                                                            onClick={() => { setConfig(prev => ({...prev, autoChannel: null})); setIsDropdownOpen(false); setChannelSearch('') }}
+                                                            className="w-full text-left px-3 py-2 rounded-md text-nexus-secondary-text hover:bg-white/5 hover:text-nexus-primary-text transition-colors"
+                                                        >
+                                                            None
+                                                        </button>
+                                                    </li>
+                                                    {filteredChannels.map(channel => (
+                                                        <li key={channel.id}>
+                                                            <button 
+                                                                onClick={() => { setConfig(prev => ({...prev, autoChannel: channel.id})); setIsDropdownOpen(false); setChannelSearch('') }}
+                                                                className={`w-full text-left px-3 py-2 rounded-md transition-colors ${config.autoChannel === channel.id ? 'bg-nexus-accent-primary/10 text-nexus-accent-glow font-medium' : 'hover:bg-white/5 hover:text-nexus-primary-text'}`}
+                                                            >
+                                                                # {channel.name}
+                                                            </button>
+                                                        </li>
+                                                    ))}
+                                                    {filteredChannels.length === 0 && channelSearch && (
+                                                        <li className="text-center text-sm text-nexus-secondary-text py-2">No channels found.</li>
+                                                    )}
+                                                </ul>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
                             )}
                         </div>
                     </div>

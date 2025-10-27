@@ -1,7 +1,7 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { DiscordGuild } from '../types';
-import { SpinnerIcon, PlusIcon, ChevronRightIcon, LogInIcon, LayoutGridIcon } from './icons/Icons';
+import { SpinnerIcon, PlusIcon, ChevronRightIcon, LogInIcon } from './icons/Icons';
 import { supabase } from '../lib/supabaseClient';
 
 const BOT_INVITE_URL = 'https://discord.com/oauth2/authorize?client_id=1430883691944738958&permissions=8&integration_type=0&scope=bot';
@@ -58,17 +58,14 @@ interface ServerSelectorProps {
 const ServerSelector: React.FC<ServerSelectorProps> = ({ session, onServerSelected, onLogin }) => {
   const [guilds, setGuilds] = useState<DiscordGuild[]>([]);
   const [botGuildIds, setBotGuildIds] = useState<Set<string>>(new Set());
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [hasFetched, setHasFetched] = useState(false);
   const loadingRef = useRef(false);
 
-  const fetchAndProcessGuilds = async () => {
+  const fetchAndProcessGuilds = useCallback(async () => {
     if (loadingRef.current || !session) return;
     loadingRef.current = true;
-    setLoading(true);
     setError(null);
-    setHasFetched(true);
     
     const cacheKey = `guilds-cache-${session.user.id}`;
     
@@ -78,8 +75,6 @@ const ServerSelector: React.FC<ServerSelectorProps> = ({ session, onServerSelect
           const { guilds: cachedGuilds, botGuildIds: cachedBotGuildIds } = JSON.parse(cachedData);
           setGuilds(cachedGuilds);
           setBotGuildIds(new Set(cachedBotGuildIds));
-          setLoading(false);
-          loadingRef.current = false;
           return;
       }
 
@@ -125,7 +120,12 @@ const ServerSelector: React.FC<ServerSelectorProps> = ({ session, onServerSelect
       setLoading(false);
       loadingRef.current = false;
     }
-  };
+  }, [session]);
+
+  useEffect(() => {
+    fetchAndProcessGuilds();
+  }, [fetchAndProcessGuilds]);
+
 
   const isAuthError = error && (error.toLowerCase().includes('authentication error') || error.toLowerCase().includes('discord connection expired'));
 
@@ -135,9 +135,6 @@ const ServerSelector: React.FC<ServerSelectorProps> = ({ session, onServerSelect
         @keyframes fade-in-up {
             from { opacity: 0; transform: translateY(20px); }
             to { opacity: 1; transform: translateY(0); }
-        }
-        .animate-fade-in-up {
-            animation: fade-in-up 0.5s ease-out forwards;
         }
         /* Custom scrollbar for server list */
         .server-list::-webkit-scrollbar {
@@ -175,8 +172,7 @@ const ServerSelector: React.FC<ServerSelectorProps> = ({ session, onServerSelect
                     </button>
                 )}
             </div>
-          ) : hasFetched ? (
-            guilds.length > 0 ? (
+          ) : guilds.length > 0 ? (
                 <div className="flex flex-col gap-3 max-h-[60vh] overflow-y-auto pr-2 server-list">
                     {guilds.map((guild, index) => (
                         <ServerListItem 
@@ -202,21 +198,7 @@ const ServerSelector: React.FC<ServerSelectorProps> = ({ session, onServerSelect
                     </a>
                 </div>
             )
-          ) : (
-            <div className="flex-1 flex flex-col justify-center items-center text-center p-4">
-              <p className="text-nexus-primary-text font-medium mb-2">Ready to get started?</p>
-              <p className="text-nexus-secondary-text text-sm mb-6 max-w-xs">
-                We'll check for servers where you have admin permissions.
-              </p>
-              <button
-                onClick={fetchAndProcessGuilds}
-                className="group w-full sm:w-auto flex items-center justify-center gap-2.5 px-6 py-3 text-base font-semibold text-white bg-gradient-to-br from-nexus-accent-start to-nexus-accent-glow rounded-xl focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-nexus-accent-primary focus:ring-offset-nexus-background transition-all duration-300 hover:scale-105 hover:shadow-[0_0_20px_rgba(0,180,255,0.4)]"
-              >
-                <LayoutGridIcon className="h-5 w-5" />
-                <span>Fetch My Servers</span>
-              </button>
-            </div>
-          )}
+          }
         </div>
     </div>
     </>

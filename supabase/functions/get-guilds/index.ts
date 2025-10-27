@@ -133,34 +133,28 @@ Deno.serve(async (req: Request) => {
             name: g.name,
             owner: g.owner,
             permissions: g.permissions,
-            permissions_decimal: g.permissions
         })));
         
-        // 5. Filter for guilds where the user has Admin permissions OR is the owner
+        // 5. Filter for guilds where the user has Administrator permissions
         const manageableGuilds = guilds.filter((guild: any) => {
             try {
-                // If user is owner, include
-                if (guild.owner === true) {
-                    console.log(`✅ Including guild "${guild.name}" - User is owner`);
+                if (typeof guild.permissions !== 'string') {
+                    console.log(`❌ Excluding guild "${guild.name}" - No valid permissions data`);
+                    return false;
+                }
+        
+                // The permissions value is a bitwise flag. The ADMINISTRATOR permission is the 4th bit (0x8).
+                const permissions = BigInt(guild.permissions);
+                const hasAdmin = (permissions & 0x8n) === 0x8n; // 0x8n is the BigInt literal for the ADMINISTRATOR flag
+        
+                if (hasAdmin) {
+                    // This includes owners, as they have all permissions.
+                    console.log(`✅ Including guild "${guild.name}" - User has Administrator permissions.`);
                     return true;
+                } else {
+                    console.log(`❌ Excluding guild "${guild.name}" - No Administrator permissions (permissions: ${guild.permissions})`);
+                    return false;
                 }
-                
-                // Check for Administrator permissions
-                if (typeof guild.permissions === 'string') {
-                    const permissions = BigInt(guild.permissions);
-                    const hasAdmin = (permissions & 0x8n) === 0x8n; // ADMINISTRATOR permission
-                    
-                    if (hasAdmin) {
-                        console.log(`✅ Including guild "${guild.name}" - User has Administrator permissions`);
-                        return true;
-                    } else {
-                        console.log(`❌ Excluding guild "${guild.name}" - No Administrator permissions (permissions: ${guild.permissions})`);
-                        return false;
-                    }
-                }
-                
-                console.log(`❌ Excluding guild "${guild.name}" - No valid permissions data`);
-                return false;
             } catch(e) {
                 console.error(`❌ Failed to parse permissions for guild ${guild.id}:`, guild.permissions, e);
                 return false;
