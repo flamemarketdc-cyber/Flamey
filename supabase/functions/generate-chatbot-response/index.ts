@@ -32,9 +32,9 @@ serve(async (req) => {
     // Initialize the GoogleGenAI client
     const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
 
-    // Generate content using the gemini-flash-lite-latest model for faster responses
+    // Generate content using the gemini-2.5-flash model for better persona adherence
     const response = await ai.models.generateContent({
-        model: 'gemini-flash-lite-latest',
+        model: 'gemini-2.5-flash',
         contents: prompt,
         config: {
           systemInstruction: systemInstruction || "You are a friendly and helpful Discord bot.", // Fallback if not provided
