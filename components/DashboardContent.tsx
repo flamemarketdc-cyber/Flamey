@@ -224,7 +224,7 @@ const HowItWorksItem: React.FC<{ icon: React.ReactNode; title: string; children:
 );
 
 const AIChatbotContent: React.FC<{ server: DiscordGuild }> = ({ server }) => {
-    const BOT_INVITE_URL = 'https://discord.com/oauth2/authorize?client_id=1430883691944738958&permissions=8&integration_type=0&scope=bot';
+    const BOT_INVITE_URL = 'https://discord.com/oauth2/authorize?client_id=1430883691944738958&permissions=2147483648&integration_type=0&scope=bot';
     
     type Config = {
         enabled: boolean;
