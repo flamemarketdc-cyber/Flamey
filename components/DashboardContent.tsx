@@ -161,7 +161,8 @@ const GeneralSettings: React.FC<{server: DiscordGuild}> = ({ server }) => {
         setError('');
         const { error } = await supabase
             .from('guild_configs')
-            .upsert({ guild_id: server.id, prefix: prefix });
+            .upsert({ guild_id: server.id, prefix: prefix })
+            .select();
 
         if (error) {
             console.error('Error saving prefix:', error);
@@ -315,7 +316,8 @@ const AIChatbotContent: React.FC<{ server: DiscordGuild }> = ({ server }) => {
                 ai_chatbot_auto_channel_enabled: config.autoChannelEnabled,
                 ai_chatbot_auto_channel: config.autoChannel,
                 ai_chatbot_persona: config.persona,
-            });
+            })
+            .select();
 
         if (saveError) {
             setError(`Failed to save settings: ${saveError.message}`);
