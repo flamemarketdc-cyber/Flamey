@@ -1,7 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { type Feature, DiscordGuild } from '../types';
 import { supabase } from '../lib/supabaseClient';
-import { SpinnerIcon, BotIcon, MessageSquareIcon, AtSignIcon, BookOpenIcon, SparklesIcon, ChevronDownIcon } from './icons/Icons';
+import { 
+    SpinnerIcon, BotIcon, MessageSquareIcon, AtSignIcon, BookOpenIcon, SparklesIcon, ChevronDownIcon, 
+    ChevronLeftIcon, SearchIcon, HelpCircleIcon, MoreVerticalIcon, LinkIcon, KeyIcon, Trash2Icon, CornerUpLeftIcon, ClockIcon 
+} from './icons/Icons';
+import { defaultCommands } from '../lib/dashboardConfig';
 
 const baseCardStyles = 'bg-nexus-surface border border-white/5 rounded-xl';
 const hoverCardStyles = 'hover:border-nexus-accent-primary/30';
@@ -10,6 +14,7 @@ const formInputStyles = "w-full bg-nexus-overlay border border-white/10 rounded-
 interface ContentComponentProps {
     server: DiscordGuild;
     onUnsavedChangesChange: (hasChanges: boolean) => void;
+    shakeKey: number;
 }
 
 const Card: React.FC<{ children: React.ReactNode; className?: string; interactive?: boolean }> = ({ children, className = '', interactive = false }) => (
@@ -40,32 +45,45 @@ const ToggleSwitch: React.FC<{ enabled: boolean; onChange: (enabled: boolean) =>
     </div>
 );
 
-const SaveBar: React.FC<{ isVisible: boolean; onSave: () => void; onReset: () => void; isSaving: boolean }> = ({ isVisible, onSave, onReset, isSaving }) => (
-    <div className={`sticky bottom-0 left-0 right-0 w-full transition-all duration-500 ease-in-out ${isVisible ? 'translate-y-0 opacity-100' : 'translate-y-full opacity-0 pointer-events-none'}`}>
-        <div className="max-w-4xl mx-auto p-4">
-             <div className="flex items-center justify-between gap-4 p-4 rounded-xl bg-nexus-overlay/80 backdrop-blur-lg border border-white/10 shadow-2xl shadow-black/50">
-                 <p className="font-medium text-sm text-nexus-accent-glow">You have unsaved changes!</p>
-                 <div className="flex items-center gap-3">
-                    <button 
-                        onClick={onReset}
-                        disabled={isSaving}
-                        className="px-5 py-2 text-sm font-medium text-nexus-secondary-text bg-transparent border border-white/10 rounded-lg hover:bg-white/5 hover:text-nexus-primary-text disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                    >
-                        Reset
-                    </button>
-                    <button 
-                        onClick={onSave}
-                        disabled={isSaving}
-                        className="px-5 py-2 text-sm font-medium text-white bg-gradient-to-r from-nexus-accent-primary to-nexus-accent-glow rounded-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 transition-all hover:scale-105 hover:shadow-[0_0_15px_rgba(0,180,255,0.3)]"
-                    >
-                        {isSaving && <SpinnerIcon className="h-4 w-4"/>}
-                        Save Changes
-                    </button>
+const SaveBar: React.FC<{ isVisible: boolean; onSave: () => void; onReset: () => void; isSaving: boolean; shakeKey: number; }> = ({ isVisible, onSave, onReset, isSaving, shakeKey }) => {
+    const [isShaking, setIsShaking] = useState(false);
+
+    useEffect(() => {
+        if (shakeKey > 0) {
+            setIsShaking(true);
+        }
+    }, [shakeKey]);
+
+    return (
+        <div
+            className={`sticky bottom-0 left-0 right-0 w-full transition-all duration-500 ease-in-out ${isVisible ? 'translate-y-0 opacity-100' : 'translate-y-full opacity-0 pointer-events-none'}`}
+            onAnimationEnd={() => setIsShaking(false)}
+        >
+            <div className="max-w-4xl mx-auto p-4">
+                 <div className={`flex items-center justify-between gap-4 p-4 rounded-xl bg-nexus-overlay/80 backdrop-blur-lg border border-white/10 shadow-2xl shadow-black/50 ${isShaking ? 'animate-shake' : ''}`}>
+                     <p className="font-medium text-sm text-nexus-accent-glow">You have unsaved changes!</p>
+                     <div className="flex items-center gap-3">
+                        <button 
+                            onClick={onReset}
+                            disabled={isSaving}
+                            className="px-5 py-2 text-sm font-medium text-nexus-secondary-text bg-transparent border border-white/10 rounded-lg hover:bg-white/5 hover:text-nexus-primary-text disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        >
+                            Reset
+                        </button>
+                        <button 
+                            onClick={onSave}
+                            disabled={isSaving}
+                            className="px-5 py-2 text-sm font-medium text-white bg-gradient-to-r from-nexus-accent-primary to-nexus-accent-glow rounded-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 transition-all hover:scale-105 hover:shadow-[0_0_15px_rgba(0,180,255,0.3)]"
+                        >
+                            {isSaving && <SpinnerIcon className="h-4 w-4"/>}
+                            Save Changes
+                        </button>
+                     </div>
                  </div>
-             </div>
+            </div>
         </div>
-    </div>
-);
+    );
+};
 
 
 const DashboardHome: React.FC<ContentComponentProps> = ({ server, onUnsavedChangesChange }) => {
@@ -96,8 +114,159 @@ const DashboardHome: React.FC<ContentComponentProps> = ({ server, onUnsavedChang
     );
 };
 
+// --- COMMANDS SECTION ---
 
-const MessagesContent: React.FC<ContentComponentProps> = ({server, onUnsavedChangesChange}) => {
+const CommandItem: React.FC<{ command: typeof defaultCommands[0] }> = ({ command }) => {
+    const [showHelp, setShowHelp] = useState(false);
+    const [showMenu, setShowMenu] = useState(false);
+    const helpRef = useRef<HTMLDivElement>(null);
+    const menuRef = useRef<HTMLDivElement>(null);
+    const helpButtonRef = useRef<HTMLButtonElement>(null);
+    const menuButtonRef = useRef<HTMLButtonElement>(null);
+
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (helpRef.current && !helpRef.current.contains(event.target as Node) && !helpButtonRef.current?.contains(event.target as Node)) setShowHelp(false);
+            if (menuRef.current && !menuRef.current.contains(event.target as Node) && !menuButtonRef.current?.contains(event.target as Node)) setShowMenu(false);
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    const menuItems = [
+        { name: 'Aliases', icon: <LinkIcon className="h-4 w-4" /> },
+        { name: 'Permissions', icon: <KeyIcon className="h-4 w-4" /> },
+        { name: 'Auto delete', icon: <Trash2Icon className="h-4 w-4" /> },
+        { name: 'Auto reply', icon: <CornerUpLeftIcon className="h-4 w-4" /> },
+        { name: 'Cooldown', icon: <ClockIcon className="h-4 w-4" /> },
+    ];
+
+    return (
+        <div className="bg-nexus-surface border border-white/5 rounded-xl px-4 py-3 flex items-center justify-between">
+            <span className="font-mono text-nexus-primary-text text-sm">{command.name}</span>
+            <div className="flex items-center gap-1">
+                <div className="relative">
+                    <button
+                        ref={helpButtonRef}
+                        onClick={() => setShowHelp(p => !p)}
+                        className="p-2 text-nexus-secondary-text hover:text-nexus-primary-text hover:bg-white/5 rounded-md transition-colors"
+                    >
+                        <HelpCircleIcon className="h-5 w-5" />
+                    </button>
+                    {showHelp && (
+                        <div ref={helpRef} className="absolute bottom-full right-0 mb-2 w-64 bg-nexus-overlay border border-white/10 rounded-lg shadow-2xl p-3 z-10 animate-fade-in-up">
+                            <p className="text-sm font-semibold text-nexus-primary-text">{command.name}</p>
+                            <p className="text-xs text-nexus-secondary-text mt-1">{command.description}</p>
+                            <p className="text-xs font-mono bg-nexus-background p-1.5 rounded mt-2 text-nexus-accent-glow">
+                                {command.usage}
+                            </p>
+                        </div>
+                    )}
+                </div>
+                <div className="relative">
+                    <button
+                        ref={menuButtonRef}
+                        onClick={() => setShowMenu(p => !p)}
+                        className="p-2 text-nexus-secondary-text hover:text-nexus-primary-text hover:bg-white/5 rounded-md transition-colors"
+                    >
+                        <MoreVerticalIcon className="h-5 w-5" />
+                    </button>
+                    {showMenu && (
+                        <div ref={menuRef} className="absolute top-full right-0 mt-2 w-48 bg-nexus-overlay border border-white/10 rounded-lg shadow-2xl p-2 z-10 animate-fade-in-up">
+                            {menuItems.map(item => (
+                                <button
+                                    key={item.name}
+                                    disabled
+                                    className="w-full flex items-center gap-3 p-2 rounded-md text-left text-sm font-medium transition-colors text-nexus-secondary-text/50 cursor-not-allowed"
+                                >
+                                    {item.icon}
+                                    <span>{item.name}</span>
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+};
+
+const DefaultCommandsList: React.FC<{ onBack: () => void }> = ({ onBack }) => {
+    const [searchTerm, setSearchTerm] = useState('');
+    const filteredCommands = defaultCommands.filter(cmd => cmd.name.toLowerCase().includes(searchTerm.toLowerCase()));
+
+    return (
+        <div>
+            <button onClick={onBack} className="flex items-center gap-2 text-sm text-nexus-secondary-text hover:text-nexus-primary-text mb-6 transition-colors group">
+                <ChevronLeftIcon className="h-4 w-4 transition-transform group-hover:-translate-x-1" />
+                Back to Commands
+            </button>
+            <Title>Default Commands</Title>
+            <p className="text-nexus-secondary-text -mt-4 mb-6 max-w-2xl">
+                Here you can view all of Flamey's built-in commands. Configuration for individual commands, such as aliases and permissions, will be available soon.
+            </p>
+            <div className="relative mb-6">
+                <SearchIcon className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-nexus-secondary-text/50" />
+                <input
+                    type="text"
+                    placeholder="Search commands..."
+                    value={searchTerm}
+                    onChange={e => setSearchTerm(e.target.value)}
+                    className={`${formInputStyles} pl-11`}
+                />
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {filteredCommands.map(command => <CommandItem key={command.name} command={command} />)}
+            </div>
+             {filteredCommands.length === 0 && (
+                <div className="text-center py-12 text-nexus-secondary-text">
+                    <p>No commands found for "{searchTerm}"</p>
+                </div>
+             )}
+        </div>
+    );
+}
+
+const CommandsContent: React.FC<ContentComponentProps> = ({ onUnsavedChangesChange }) => {
+    const [view, setView] = useState<'main' | 'default_list'>('main');
+
+    useEffect(() => {
+        onUnsavedChangesChange(false);
+    }, [onUnsavedChangesChange, view]);
+
+    if (view === 'default_list') {
+        return <DefaultCommandsList onBack={() => setView('main')} />;
+    }
+
+    return (
+        <div className="animate-fade-in-up">
+            <Title>Commands</Title>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <button
+                    onClick={() => setView('default_list')}
+                    className="group bg-nexus-surface border border-white/5 rounded-xl p-6 text-left transition-all duration-300 hover:border-nexus-accent-primary/30 hover:-translate-y-1 hover:shadow-2xl hover:shadow-nexus-accent-primary/10"
+                >
+                    <h3 className="text-lg font-semibold text-nexus-primary-text">Default Commands</h3>
+                    <p className="text-sm text-nexus-secondary-text mt-1">View and manage all the built-in commands that come with Flamey.</p>
+                </button>
+                <div className="group bg-nexus-surface border border-white/5 rounded-xl p-6 text-left relative overflow-hidden">
+                    <div className="absolute inset-0 bg-black/30 backdrop-blur-[2px] z-10 flex items-center justify-center">
+                        <span className="text-xs font-bold uppercase tracking-widest text-nexus-secondary-text/80">Coming Soon</span>
+                    </div>
+                    <h3 className="text-lg font-semibold text-nexus-primary-text">Custom Commands</h3>
+                    <p className="text-sm text-nexus-secondary-text mt-1">Create your own powerful and flexible commands tailored for your server.</p>
+                    <button disabled className="mt-4 px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-nexus-accent-primary to-nexus-accent-glow rounded-lg disabled:opacity-50 disabled:cursor-not-allowed">
+                        Create New Command
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+// --- END COMMANDS SECTION ---
+
+
+const MessagesContent: React.FC<ContentComponentProps> = ({server, onUnsavedChangesChange, shakeKey}) => {
     type Config = {
         welcomeEnabled: boolean;
         goodbyeEnabled: boolean;
@@ -168,12 +337,12 @@ const MessagesContent: React.FC<ContentComponentProps> = ({server, onUnsavedChan
                      <ToggleSwitch enabled={config.goodbyeEnabled} onChange={val => setConfig(p => ({...p, goodbyeEnabled: val}))} label="Enable Goodbye Messages" />
                 </Card>
             </div>
-             <SaveBar isVisible={!isUnchanged} onSave={handleSave} onReset={handleReset} isSaving={isSaving} />
+             <SaveBar isVisible={!isUnchanged} onSave={handleSave} onReset={handleReset} isSaving={isSaving} shakeKey={shakeKey} />
         </div>
     );
 }
 
-const GeneralSettings: React.FC<ContentComponentProps> = ({ server, onUnsavedChangesChange }) => {
+const GeneralSettings: React.FC<ContentComponentProps> = ({ server, onUnsavedChangesChange, shakeKey }) => {
     const [prefix, setPrefix] = useState(',');
     const [initialPrefix, setInitialPrefix] = useState(',');
     const [status, setStatus] = useState<'idle' | 'loading' | 'saving' | 'success' | 'error'>('loading');
@@ -261,7 +430,7 @@ const GeneralSettings: React.FC<ContentComponentProps> = ({ server, onUnsavedCha
                  {status === 'success' && <p className="text-nexus-success text-sm mt-4">Settings saved successfully!</p>}
                  {status === 'error' && <p className="text-nexus-danger text-sm mt-4">{error}</p>}
             </Card>
-            <SaveBar isVisible={!isUnchanged} onSave={handleSave} onReset={() => setPrefix(initialPrefix)} isSaving={status === 'saving'} />
+            <SaveBar isVisible={!isUnchanged} onSave={handleSave} onReset={() => setPrefix(initialPrefix)} isSaving={status === 'saving'} shakeKey={shakeKey} />
         </div>
     );
 };
@@ -278,7 +447,7 @@ const HowItWorksItem: React.FC<{ icon: React.ReactNode; title: string; children:
     </div>
 );
 
-const AIChatbotContent: React.FC<ContentComponentProps> = ({ server, onUnsavedChangesChange }) => {
+const AIChatbotContent: React.FC<ContentComponentProps> = ({ server, onUnsavedChangesChange, shakeKey }) => {
     const BOT_INVITE_URL = 'https://discord.com/oauth2/authorize?client_id=1430883691944738958&permissions=1101596716286&scope=bot%20applications.commands';
     
     type Config = {
@@ -523,7 +692,7 @@ const AIChatbotContent: React.FC<ContentComponentProps> = ({ server, onUnsavedCh
             {status === 'success' && <p className="text-nexus-success text-sm mt-4 text-center">Settings saved successfully!</p>}
             {status === 'error' && <p className="text-nexus-danger text-sm mt-4 text-center">{error}</p>}
 
-            <SaveBar isVisible={!isUnchanged} onSave={handleSave} onReset={() => setConfig(initialConfig)} isSaving={status === 'saving'} />
+            <SaveBar isVisible={!isUnchanged} onSave={handleSave} onReset={() => setConfig(initialConfig)} isSaving={status === 'saving'} shakeKey={shakeKey} />
         </div>
     );
 };
@@ -547,7 +716,7 @@ const PlaceholderContent: React.FC<{title: string} & ContentComponentProps> = ({
 const componentMap: Record<Feature, React.ComponentType<ContentComponentProps>> = {
     dashboard_home: DashboardHome,
     general_settings: GeneralSettings,
-    commands: (props) => <PlaceholderContent title="Commands" {...props} />,
+    commands: CommandsContent,
     messages: MessagesContent,
     custom_branding: (props) => <PlaceholderContent title="Custom Branding" {...props} />,
     ticket_system: (props) => <PlaceholderContent title="Ticket System" {...props} />,
@@ -563,11 +732,12 @@ interface DashboardContentProps {
   feature: Feature;
   server: DiscordGuild;
   onUnsavedChangesChange: (hasChanges: boolean) => void;
+  shakeKey: number;
 }
 
-const DashboardContent: React.FC<DashboardContentProps> = ({ feature, server, onUnsavedChangesChange }) => {
+const DashboardContent: React.FC<DashboardContentProps> = ({ feature, server, onUnsavedChangesChange, shakeKey }) => {
   const ContentComponent = componentMap[feature] || DashboardHome;
-  return <ContentComponent server={server} onUnsavedChangesChange={onUnsavedChangesChange} />;
+  return <ContentComponent server={server} onUnsavedChangesChange={onUnsavedChangesChange} shakeKey={shakeKey} />;
 };
 
 export default DashboardContent;

@@ -188,18 +188,17 @@ const Dashboard: React.FC<DashboardProps> = ({ session, onLogout, server, onGoTo
     const [activeFeature, setActiveFeature] = useState<Feature>(getFeatureFromHash());
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+    const [shakeKey, setShakeKey] = useState(0);
 
     useEffect(() => {
         const handleHashChange = () => {
-            if (hasUnsavedChanges) {
-                if (confirm('You have unsaved changes. Are you sure you want to discard them and leave?')) {
-                    setHasUnsavedChanges(false); // Allow navigation
-                    setActiveFeature(getFeatureFromHash());
-                } else {
-                   window.location.hash = `#/dashboard/${activeFeature}`; // Revert hash change
-                }
+            const newFeature = getFeatureFromHash();
+            if (hasUnsavedChanges && newFeature !== activeFeature) {
+                // Prevent navigation and shake the save bar
+                window.history.replaceState(null, '', `#/dashboard/${activeFeature}`);
+                setShakeKey(key => key + 1);
             } else {
-                 setActiveFeature(getFeatureFromHash());
+                 setActiveFeature(newFeature);
             }
         };
         window.addEventListener('hashchange', handleHashChange);
@@ -235,11 +234,8 @@ const Dashboard: React.FC<DashboardProps> = ({ session, onLogout, server, onGoTo
     }, []);
     
     const handleSetActiveFeature = (feature: Feature) => {
-        if (hasUnsavedChanges) {
-            if (confirm('You have unsaved changes. Are you sure you want to discard them and leave?')) {
-                 setHasUnsavedChanges(false);
-                 window.location.hash = `#/dashboard/${feature}`;
-            }
+        if (hasUnsavedChanges && feature !== activeFeature) {
+            setShakeKey(key => key + 1);
         } else {
             window.location.hash = `#/dashboard/${feature}`;
         }
@@ -264,7 +260,6 @@ const Dashboard: React.FC<DashboardProps> = ({ session, onLogout, server, onGoTo
                         setActiveFeature={handleSetActiveFeature}
                         isOpen={isSidebarOpen}
                         setIsOpen={setIsSidebarOpen}
-                        isNavDisabled={hasUnsavedChanges}
                     />
                 </div>
                 {/* Mobile sidebar needs to be handled outside the main layout flow */}
@@ -274,7 +269,6 @@ const Dashboard: React.FC<DashboardProps> = ({ session, onLogout, server, onGoTo
                         setActiveFeature={handleSetActiveFeature}
                         isOpen={isSidebarOpen}
                         setIsOpen={setIsSidebarOpen}
-                        isNavDisabled={hasUnsavedChanges}
                     />
                 </div>
                 
@@ -286,7 +280,12 @@ const Dashboard: React.FC<DashboardProps> = ({ session, onLogout, server, onGoTo
                         .main-content::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }
                     `}</style>
                     <div className="max-w-6xl mx-auto px-8 py-10">
-                        <DashboardContent feature={activeFeature} server={server} onUnsavedChangesChange={setHasUnsavedChanges} />
+                        <DashboardContent 
+                            feature={activeFeature} 
+                            server={server} 
+                            onUnsavedChangesChange={setHasUnsavedChanges}
+                            shakeKey={shakeKey}
+                        />
                     </div>
                 </main>
             </div>
