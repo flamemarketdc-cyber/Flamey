@@ -260,7 +260,7 @@ const AIChatbotContent: React.FC<{ server: DiscordGuild }> = ({ server }) => {
             try {
                 const [channelsResponse, configResponse] = await Promise.all([
                     supabase.functions.invoke('get-guild-channels', { body: { guildId } }),
-                    supabase.from('guild_configs').select('ai_chatbot_enabled, ai_chatbot_auto_channel, ai_chatbot_persona, ai_chatbot_auto_channel_enabled').eq('guild_id', guildId).single(),
+                    supabase.from('guild_configs').select('ai_chatbot_enabled, ai_chatbot_auto_channel, ai_chatbot_persona').eq('guild_id', guildId).single(),
                 ]);
 
                 const { data: channelsData, error: channelsInvokeError } = channelsResponse;
@@ -276,10 +276,10 @@ const AIChatbotContent: React.FC<{ server: DiscordGuild }> = ({ server }) => {
                 if (configError && configError.code !== 'PGRST116') {
                     throw new Error(`Failed to load settings: ${configError.message}`);
                 }
-
+                
                 const newConfig: Config = {
                     enabled: configData?.ai_chatbot_enabled ?? false,
-                    autoChannelEnabled: configData?.ai_chatbot_auto_channel_enabled ?? false,
+                    autoChannelEnabled: !!configData?.ai_chatbot_auto_channel,
                     autoChannel: configData?.ai_chatbot_auto_channel ?? null,
                     persona: configData?.ai_chatbot_persona ?? '',
                 };
@@ -313,8 +313,7 @@ const AIChatbotContent: React.FC<{ server: DiscordGuild }> = ({ server }) => {
             .upsert({ 
                 guild_id: guildId, 
                 ai_chatbot_enabled: config.enabled,
-                ai_chatbot_auto_channel_enabled: config.autoChannelEnabled,
-                ai_chatbot_auto_channel: config.autoChannel,
+                ai_chatbot_auto_channel: config.autoChannelEnabled ? config.autoChannel : null,
                 ai_chatbot_persona: config.persona,
             })
             .select();
