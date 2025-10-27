@@ -51,25 +51,15 @@ const App: React.FC = () => {
 
   // --- Session Management ---
   useEffect(() => {
-    const fetchSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      setSession(session);
-      setLoading(false);
-    };
-    fetchSession();
-
+    setLoading(true);
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
+      setLoading(false); // Session state is determined, stop loading.
 
-      if (_event === 'SIGNED_IN') {
-        // On successful login, always redirect to the server selection page.
-        navigate('/select-server');
-      }
-
-      if (!session) {
+      // Handle user logout
+      if (_event === 'SIGNED_OUT') {
         setSelectedServer(null);
         localStorage.removeItem('lastSelectedServer');
-        // Clear all session storage on logout to prevent any stale cache
         sessionStorage.clear();
         if (getHashRoute() !== '/') navigate('/');
       }
@@ -79,6 +69,7 @@ const App: React.FC = () => {
       subscription?.unsubscribe();
     };
   }, [navigate]);
+
 
   // --- Store Discord Tokens When Session is Available ---
   useEffect(() => {
@@ -114,12 +105,14 @@ const App: React.FC = () => {
 
   // --- Navigation & State Sync Logic ---
   useEffect(() => {
+    if (loading) return; // Wait until session is loaded
+
+    // If user is logged in, trying to access dashboard, but no server is selected
+    // (e.g. from localStorage), then redirect them to select one.
     if (session && !selectedServer && route.startsWith('/dashboard')) {
-      // If user is logged in, trying to access dashboard, but no server is selected (e.g. from localStorage)
-      // then redirect them to select one.
       navigate('/select-server');
     }
-  }, [session, selectedServer, route, navigate]);
+  }, [session, selectedServer, route, navigate, loading]);
 
 
   // --- LOGIN HANDLER ---
@@ -128,7 +121,7 @@ const App: React.FC = () => {
       provider: 'discord',
       options: {
         scopes: 'guilds identify email guilds.members.read',
-        redirectTo: window.location.origin,
+        redirectTo: `${window.location.origin}/callback.html`,
       }
     });
 
@@ -145,7 +138,6 @@ const App: React.FC = () => {
 
   // --- DASHBOARD NAVIGATION ---
   const handleDashboardClick = () => {
-    // Relies on selectedServer state which is now initialized from localStorage
     if (selectedServer) {
         navigate('/dashboard');
     } else {
