@@ -3,7 +3,8 @@ import { type Feature, DiscordGuild } from '../types';
 import { supabase } from '../lib/supabaseClient';
 import { 
     SpinnerIcon, BotIcon, MessageSquareIcon, AtSignIcon, BookOpenIcon, SparklesIcon, ChevronDownIcon, 
-    ChevronLeftIcon, SearchIcon, HelpCircleIcon, MoreVerticalIcon, LinkIcon, KeyIcon, Trash2Icon, CornerUpLeftIcon, ClockIcon 
+    ChevronLeftIcon, SearchIcon, HelpCircleIcon, MoreVerticalIcon, LinkIcon, KeyIcon, Trash2Icon, CornerUpLeftIcon, ClockIcon, 
+    EditIcon, HomeIcon, CogIcon, GitBranchIcon, ListIcon, ChevronRightIcon, LifeBuoyIcon, ShieldCheckIcon, GiftIcon, FileTextIcon, GraduationCapIcon, StarIcon
 } from './icons/Icons';
 import { defaultCommands } from '../lib/dashboardConfig';
 
@@ -23,12 +24,13 @@ const Card: React.FC<{ children: React.ReactNode; className?: string; interactiv
   </div>
 );
 
-const Title: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-    <div className="relative mb-6">
-        <h2 className="text-3xl font-bold tracking-tight text-nexus-primary-text">{children}</h2>
-        <div className="absolute -bottom-3 left-0 h-px w-full bg-gradient-to-r from-nexus-accent-primary/20 via-nexus-accent-primary/5 to-transparent" />
+const Title: React.FC<{ children: React.ReactNode; icon?: React.ReactNode }> = ({ children, icon }) => (
+    <div className="relative mb-8 flex items-center gap-4">
+        {icon}
+        <h2 className="text-4xl font-extrabold tracking-tight text-nexus-primary-text">{children}</h2>
     </div>
 );
+
 
 const ToggleSwitch: React.FC<{ enabled: boolean; onChange: (enabled: boolean) => void; label: string, disabled?: boolean }> = ({ enabled, onChange, label, disabled = false }) => (
     <div className="flex items-center justify-between">
@@ -97,7 +99,7 @@ const DashboardHome: React.FC<ContentComponentProps> = ({ server, onUnsavedChang
 
     return (
         <div className="animate-fade-in-up">
-            <Title>Welcome to {server.name}</Title>
+            <Title icon={<HomeIcon className="h-8 w-8 text-nexus-accent-primary" />}>Welcome to {server.name}</Title>
             <Card className="p-8 flex flex-col md:flex-row items-center gap-8">
                 <img src={serverIconUrl} alt={`${server.name} icon`} className="w-24 h-24 rounded-2xl flex-shrink-0" />
                 <div>
@@ -196,13 +198,13 @@ const DefaultCommandsList: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     const filteredCommands = defaultCommands.filter(cmd => cmd.name.toLowerCase().includes(searchTerm.toLowerCase()));
 
     return (
-        <div>
+        <div className="animate-fade-in-up">
             <button onClick={onBack} className="flex items-center gap-2 text-sm text-nexus-secondary-text hover:text-nexus-primary-text mb-6 transition-colors group">
                 <ChevronLeftIcon className="h-4 w-4 transition-transform group-hover:-translate-x-1" />
                 Back to Commands
             </button>
-            <Title>Default Commands</Title>
-            <p className="text-nexus-secondary-text -mt-4 mb-6 max-w-2xl">
+            <Title icon={<ListIcon className="h-8 w-8 text-nexus-accent-primary" />}>Default Commands</Title>
+            <p className="text-nexus-secondary-text -mt-6 mb-6 max-w-2xl">
                 Here you can view all of Flamey's built-in commands. Configuration for individual commands, such as aliases and permissions, will be available soon.
             </p>
             <div className="relative mb-6">
@@ -239,26 +241,47 @@ const CommandsContent: React.FC<ContentComponentProps> = ({ onUnsavedChangesChan
     }
 
     return (
-        <div className="animate-fade-in-up">
-            <Title>Commands</Title>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <button
-                    onClick={() => setView('default_list')}
-                    className="group bg-nexus-surface border border-white/5 rounded-xl p-6 text-left transition-all duration-300 hover:border-nexus-accent-primary/30 hover:-translate-y-1 hover:shadow-2xl hover:shadow-nexus-accent-primary/10"
-                >
-                    <h3 className="text-lg font-semibold text-nexus-primary-text">Default Commands</h3>
-                    <p className="text-sm text-nexus-secondary-text mt-1">View and manage all the built-in commands that come with Flamey.</p>
-                </button>
-                <div className="group bg-nexus-surface border border-white/5 rounded-xl p-6 text-left relative overflow-hidden">
-                    <div className="absolute inset-0 bg-black/30 backdrop-blur-[2px] z-10 flex items-center justify-center">
-                        <span className="text-xs font-bold uppercase tracking-widest text-nexus-secondary-text/80">Coming Soon</span>
+        <div className="animate-fade-in-up space-y-8">
+            <Title icon={<EditIcon className="h-8 w-8 text-nexus-accent-primary" />}>Commands</Title>
+            
+            <div className="space-y-4">
+                {/* Custom Commands Card */}
+                <div className="bg-nexus-surface border border-white/5 rounded-xl p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
+                    <div className="flex items-start gap-5">
+                        <div className="flex-shrink-0 text-nexus-accent-glow mt-1">
+                            <GitBranchIcon className="h-6 w-6" />
+                        </div>
+                        <div>
+                            <h3 className="text-lg font-semibold text-nexus-primary-text">Custom commands</h3>
+                            <p className="text-sm text-nexus-secondary-text mt-1">Create and manage your own commands.</p>
+                        </div>
                     </div>
-                    <h3 className="text-lg font-semibold text-nexus-primary-text">Custom Commands</h3>
-                    <p className="text-sm text-nexus-secondary-text mt-1">Create your own powerful and flexible commands tailored for your server.</p>
-                    <button disabled className="mt-4 px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-nexus-accent-primary to-nexus-accent-glow rounded-lg disabled:opacity-50 disabled:cursor-not-allowed">
-                        Create New Command
+                    <button 
+                        disabled 
+                        className="flex-shrink-0 w-full sm:w-auto px-5 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-blue-500 transition-colors"
+                    >
+                        Create new command
                     </button>
                 </div>
+
+                {/* Default Commands Card */}
+                <button
+                    onClick={() => setView('default_list')}
+                    className="w-full bg-nexus-surface border border-white/5 rounded-xl p-6 flex items-center justify-between gap-6 text-left transition-all duration-300 hover:border-nexus-accent-primary/40 hover:-translate-y-1 hover:shadow-2xl hover:shadow-nexus-accent-primary/10 group"
+                >
+                    <div className="flex items-start gap-5">
+                         <div className="flex-shrink-0 text-nexus-accent-glow mt-1">
+                            <ListIcon className="h-6 w-6" />
+                        </div>
+                        <div>
+                            <h3 className="text-lg font-semibold text-nexus-primary-text">Default commands</h3>
+                            <p className="text-sm text-nexus-secondary-text mt-1 max-w-lg">
+                                Update permissions, aliases and more for all default commands. You can also enable/disable slash commands here.
+                            </p>
+                        </div>
+                    </div>
+                    <ChevronRightIcon className="h-6 w-6 text-nexus-secondary-text flex-shrink-0 transition-transform group-hover:translate-x-1" />
+                </button>
             </div>
         </div>
     );
@@ -309,7 +332,7 @@ const MessagesContent: React.FC<ContentComponentProps> = ({server, onUnsavedChan
 
     return (
         <div className="animate-fade-in-up">
-            <Title>Welcome & Goodbye Messages</Title>
+            <Title icon={<MessageSquareIcon className="h-8 w-8 text-nexus-accent-primary" />}>Welcome & Goodbye Messages</Title>
             <div className="space-y-6">
                 <Card className="p-6">
                     <ToggleSwitch enabled={config.welcomeEnabled} onChange={val => setConfig(p => ({...p, welcomeEnabled: val}))} label="Enable Welcome Messages" />
@@ -402,7 +425,7 @@ const GeneralSettings: React.FC<ContentComponentProps> = ({ server, onUnsavedCha
     if (status === 'loading') {
         return (
             <div className="animate-fade-in-up">
-                <Title>General Settings</Title>
+                <Title icon={<CogIcon className="h-8 w-8 text-nexus-accent-primary" />}>General Settings</Title>
                 <Card className="flex justify-center items-center h-48">
                     <SpinnerIcon className="h-8 w-8 text-nexus-accent-primary" />
                 </Card>
@@ -412,7 +435,7 @@ const GeneralSettings: React.FC<ContentComponentProps> = ({ server, onUnsavedCha
 
     return (
         <div className="animate-fade-in-up">
-            <Title>General Settings</Title>
+            <Title icon={<CogIcon className="h-8 w-8 text-nexus-accent-primary" />}>General Settings</Title>
             <Card className="p-6 md:p-8">
                 <h3 className="text-xl font-semibold text-nexus-primary-text">Command Prefix</h3>
                 <p className="text-sm text-nexus-secondary-text mt-2 mb-6">Set the prefix used to trigger bot commands in your server.</p>
@@ -565,7 +588,7 @@ const AIChatbotContent: React.FC<ContentComponentProps> = ({ server, onUnsavedCh
     if (status === 'loading') {
         return (
             <div className="animate-fade-in-up">
-                <Title>AI Chatbot</Title>
+                <Title icon={<BotIcon className="h-8 w-8 text-nexus-accent-primary" />}>AI Chatbot</Title>
                 <Card className="flex justify-center items-center h-64"><SpinnerIcon className="h-8 w-8 text-nexus-accent-primary" /></Card>
             </div>
         );
@@ -573,7 +596,7 @@ const AIChatbotContent: React.FC<ContentComponentProps> = ({ server, onUnsavedCh
     
     return (
         <div className="animate-fade-in-up space-y-8">
-            <Title>AI Chatbot</Title>
+            <Title icon={<BotIcon className="h-8 w-8 text-nexus-accent-primary" />}>AI Chatbot</Title>
             
             <Card className="p-6 md:p-8">
                 <div className="space-y-8">
@@ -698,14 +721,14 @@ const AIChatbotContent: React.FC<ContentComponentProps> = ({ server, onUnsavedCh
 };
 
 
-const PlaceholderContent: React.FC<{title: string} & ContentComponentProps> = ({title, onUnsavedChangesChange}) => {
+const PlaceholderContent: React.FC<{title: string; icon: React.ReactNode} & ContentComponentProps> = ({title, icon, onUnsavedChangesChange}) => {
     useEffect(() => {
         onUnsavedChangesChange(false);
     }, [onUnsavedChangesChange]);
 
     return (
      <div className="animate-fade-in-up">
-        <Title>{title}</Title>
+        <Title icon={icon}>{title}</Title>
         <Card className="p-8">
             <p className="text-nexus-secondary-text text-center">Configuration for {title} will be available here soon.</p>
         </Card>
@@ -718,14 +741,14 @@ const componentMap: Record<Feature, React.ComponentType<ContentComponentProps>> 
     general_settings: GeneralSettings,
     commands: CommandsContent,
     messages: MessagesContent,
-    custom_branding: (props) => <PlaceholderContent title="Custom Branding" {...props} />,
-    ticket_system: (props) => <PlaceholderContent title="Ticket System" {...props} />,
-    auto_moderation: (props) => <PlaceholderContent title="Auto Moderation" {...props}/>,
-    giveaways: (props) => <PlaceholderContent title="Giveaways" {...props}/>,
-    giveaways_claimtime: (props) => <PlaceholderContent title="Giveaway Claim Time" {...props} />,
-    logging: (props) => <PlaceholderContent title="Logging" {...props}/>,
+    custom_branding: (props) => <PlaceholderContent title="Custom Branding" icon={<StarIcon className="h-8 w-8 text-nexus-accent-primary" />} {...props} />,
+    ticket_system: (props) => <PlaceholderContent title="Ticket System" icon={<LifeBuoyIcon className="h-8 w-8 text-nexus-accent-primary" />} {...props} />,
+    auto_moderation: (props) => <PlaceholderContent title="Auto Moderation" icon={<ShieldCheckIcon className="h-8 w-8 text-nexus-accent-primary" />} {...props}/>,
+    giveaways: (props) => <PlaceholderContent title="Giveaways" icon={<GiftIcon className="h-8 w-8 text-nexus-accent-primary" />} {...props}/>,
+    giveaways_claimtime: (props) => <PlaceholderContent title="Giveaway Claim Time" icon={<ClockIcon className="h-8 w-8 text-nexus-accent-primary" />} {...props} />,
+    logging: (props) => <PlaceholderContent title="Logging" icon={<FileTextIcon className="h-8 w-8 text-nexus-accent-primary" />} {...props}/>,
     ai_chatbot: AIChatbotContent,
-    leveling: (props) => <PlaceholderContent title="Leveling" {...props} />,
+    leveling: (props) => <PlaceholderContent title="Leveling" icon={<GraduationCapIcon className="h-8 w-8 text-nexus-accent-primary" />} {...props} />,
 };
 
 interface DashboardContentProps {
