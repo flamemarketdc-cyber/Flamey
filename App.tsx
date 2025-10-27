@@ -63,6 +63,38 @@ const App: React.FC = () => {
     };
   }, [navigate]);
 
+  // --- Store Discord Tokens When Session is Available ---
+  useEffect(() => {
+    const storeDiscordTokens = async (session: Session) => {
+      if (session?.provider_token) {
+        console.log('🔄 Storing Discord tokens for user:', session.user.id);
+        
+        try {
+          const { error } = await supabase
+            .from('user_discord_tokens')
+            .upsert({
+              id: session.user.id,
+              access_token: session.provider_token,
+              refresh_token: session.provider_refresh_token,
+              expires_at: new Date(Date.now() + (session.expires_in * 1000)).toISOString(),
+            });
+
+          if (error) {
+            console.error('❌ Failed to store tokens:', error);
+          } else {
+            console.log('✅ Tokens stored successfully!');
+          }
+        } catch (err) {
+          console.error('❌ Error storing tokens:', err);
+        }
+      }
+    };
+
+    if (session) {
+      storeDiscordTokens(session);
+    }
+  }, [session]);
+
   // --- Restore Server Selection ---
   useEffect(() => {
     if (session && route.startsWith('/dashboard') && !selectedServer) {
@@ -80,30 +112,14 @@ const App: React.FC = () => {
     }
   }, [session, route, selectedServer, navigate]);
 
-  // --- LOGIN HANDLER (FIXED) ---
+  // --- LOGIN HANDLER ---
   const handleLogin = async () => {
-    // Redirect to a dedicated callback page to isolate the Supabase client's
-    // token processing from the main React app's lifecycle and routing.
-    // This provides a "clean room" for the auth hash to be processed reliably.
-    const redirectURL = `${window.location.origin}/callback.html`;
-
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'discord',
       options: {
-        // Re-ordered scopes to put the most important one ('guilds') first.
-        // This makes our intent explicit and can help override default
-        // provider configurations that might otherwise omit the scope,
-        // which prevents the provider_token from being stored.
         scopes: 'guilds identify email',
-        // We ensure offline access is requested to get a refresh_token,
-        // which allows the session to be maintained. 'consent' is used to
-        // ensure the user re-approves permissions, fixing potential scope issues.
-        queryParams: {
-          prompt: 'consent',
-          access_type: 'offline',
-        },
-        redirectTo: redirectURL,
-      },
+        redirectTo: window.location.origin,
+      }
     });
 
     if (error) {
