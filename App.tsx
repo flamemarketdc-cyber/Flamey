@@ -117,7 +117,7 @@ const App: React.FC = () => {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'discord',
       options: {
-        scopes: 'guilds identify email',
+        scopes: 'guilds identify email guilds.members.read',
         redirectTo: window.location.origin,
       }
     });
