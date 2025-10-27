@@ -105,6 +105,10 @@ const App: React.FC = () => {
 
   // --- LOGOUT HANDLER ---
   const handleLogout = async () => {
+    if (session) {
+      // Clear the session cache to prevent stale data for the next user
+      sessionStorage.removeItem(`guilds-cache-${session.user.id}`);
+    }
     const { error } = await supabase.auth.signOut();
     if (error) console.error('Error logging out:', error.message);
   };
