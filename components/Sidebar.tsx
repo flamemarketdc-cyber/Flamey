@@ -40,7 +40,7 @@ const SidebarContent: React.FC<{
         .sidebar-scroll-container::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.2); }
     `}</style>
     <div className="flex-1 overflow-y-auto sidebar-scroll-container pr-2">
-        <nav className="flex flex-col gap-1 p-4">
+        <nav className="flex flex-col gap-1 px-6 py-4">
           {navItems.map((item, index) => {
             if (item.type === 'heading') {
               return (
