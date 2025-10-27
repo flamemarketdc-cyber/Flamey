@@ -80,22 +80,20 @@ Deno.serve(async (req: Request) => {
         const userId = await getUserIdFromRequest(req, supabaseClient);
         const serviceClient = createClient(supabaseUrl, serviceKey);
         
-        // 1. Fetch the user's Discord identity directly from auth.identities as the source of truth
-        const { data: identity, error: identityError } = await serviceClient
-            .from('identities')
-            .select('identity_data')
-            .eq('user_id', userId)
-            .eq('provider', 'discord')
+        // 1. Fetch the user's Discord tokens from our custom table
+        const { data: tokens, error: tokensError } = await serviceClient
+            .from('user_discord_tokens')
+            .select('*')
+            .eq('id', userId)
             .single();
 
-        if (identityError || !identity) {
-            console.error('Identity lookup error:', identityError);
-            throw new Error('Authentication error: Could not find your Discord identity. Please try logging out and back in.');
+        if (tokensError || !tokens) {
+            console.error('Tokens lookup error:', tokensError);
+            throw new Error('Authentication error: Could not find your Discord tokens. Please log in again.');
         }
 
-        const identityData = identity.identity_data as any;
-        let accessToken = identityData?.access_token;
-        let refreshToken = identityData?.refresh_token;
+        let accessToken = tokens.access_token;
+        let refreshToken = tokens.refresh_token;
 
         if (!accessToken || !refreshToken) {
             throw new Error('Authentication error: Discord tokens are missing. Please re-authenticate.');
@@ -111,10 +109,9 @@ Deno.serve(async (req: Request) => {
                 console.log('Access token expired for user. Refreshing...');
                 const newTokens = await refreshDiscordToken(refreshToken);
 
-                // 4. Update both auth.identities and our public table with the new tokens
+                // 4. Update our tokens table with the new tokens
                 const newExpiresAt = new Date(Date.now() + newTokens.expires_in * 1000).toISOString();
                 
-                // Update public table for resilience
                 await serviceClient.from('user_discord_tokens').upsert({
                     id: userId,
                     access_token: newTokens.access_token,
@@ -122,12 +119,6 @@ Deno.serve(async (req: Request) => {
                     expires_at: newExpiresAt,
                     updated_at: new Date().toISOString()
                 });
-
-                // Update auth.identities so it doesn't become stale
-                const newIdentityData = { ...identityData, ...newTokens, expires_in: newTokens.expires_in };
-                await serviceClient.from('identities').update({
-                    identity_data: newIdentityData
-                }).eq('user_id', userId).eq('provider', 'discord');
                 
                 accessToken = newTokens.access_token;
                 guilds = await fetchDiscordGuilds(accessToken);
