@@ -135,9 +135,15 @@ Deno.serve(async (req: Request) => {
             permissions: g.permissions,
         })));
         
-        // 5. Filter for guilds where the user has Administrator permissions
+        // 5. Filter for guilds where the user has Administrator permissions or is the owner
         const manageableGuilds = guilds.filter((guild: any) => {
             try {
+                // First, check if the user is the owner of the guild. Owners always have admin rights.
+                if (guild.owner) {
+                    console.log(`✅ Including guild "${guild.name}" - User is the owner.`);
+                    return true;
+                }
+
                 if (typeof guild.permissions !== 'string') {
                     console.log(`❌ Excluding guild "${guild.name}" - No valid permissions data`);
                     return false;
@@ -148,7 +154,6 @@ Deno.serve(async (req: Request) => {
                 const hasAdmin = (permissions & 0x8n) === 0x8n; // 0x8n is the BigInt literal for the ADMINISTRATOR flag
         
                 if (hasAdmin) {
-                    // This includes owners, as they have all permissions.
                     console.log(`✅ Including guild "${guild.name}" - User has Administrator permissions.`);
                     return true;
                 } else {

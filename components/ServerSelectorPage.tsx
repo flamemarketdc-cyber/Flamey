@@ -21,9 +21,6 @@ const ServerSelectorPage: React.FC<ServerSelectorPageProps> = ({ session, onServ
           <h1 className="text-4xl font-black tracking-tighter text-nexus-primary-text">
             Select a Server
           </h1>
-           <p className="max-w-sm mx-auto text-nexus-secondary-text">
-            Choose a server where you have <span className="font-semibold text-nexus-primary-text">Administrator Permissions</span> to continue.
-          </p>
         </div>
         
         <ServerSelector 
