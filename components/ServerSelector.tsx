@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useRef } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { DiscordGuild } from '../types';
-import { SpinnerIcon, PlusIcon, ChevronRightIcon, LogInIcon } from './icons/Icons';
+import { SpinnerIcon, PlusIcon, ChevronRightIcon, LogInIcon, LayoutGridIcon } from './icons/Icons';
 import { supabase } from '../lib/supabaseClient';
 
 const BOT_INVITE_URL = 'https://discord.com/oauth2/authorize?client_id=1430883691944738958&permissions=8&integration_type=0&scope=bot';
@@ -58,81 +58,74 @@ interface ServerSelectorProps {
 const ServerSelector: React.FC<ServerSelectorProps> = ({ session, onServerSelected, onLogin }) => {
   const [guilds, setGuilds] = useState<DiscordGuild[]>([]);
   const [botGuildIds, setBotGuildIds] = useState<Set<string>>(new Set());
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [hasFetched, setHasFetched] = useState(false);
   const loadingRef = useRef(false);
 
-  useEffect(() => {
-    if (!session) {
-        setLoading(false);
-        return;
-    };
-
-    const fetchAndProcessGuilds = async () => {
-      if (loadingRef.current) return;
-      loadingRef.current = true;
-      setLoading(true);
-      setError(null);
-      
-      const cacheKey = `guilds-cache-${session.user.id}`;
-      
-      try {
-        const cachedData = sessionStorage.getItem(cacheKey);
-        if (cachedData) {
-            const { guilds: cachedGuilds, botGuildIds: cachedBotGuildIds } = JSON.parse(cachedData);
-            setGuilds(cachedGuilds);
-            setBotGuildIds(new Set(cachedBotGuildIds));
-            setLoading(false);
-            loadingRef.current = false;
-            return;
-        }
-
-        const { data: guildData, error: guildError } = await supabase.functions.invoke('get-guilds');
-        
-        if (guildError) {
-          sessionStorage.removeItem(cacheKey); // IMPORTANT: Clear cache on any failure
-          const errorBody = await guildError.context.json();
-          throw new Error(errorBody.error || 'An unknown error occurred while fetching servers.');
-        }
-
-        const adminGuilds: DiscordGuild[] = guildData.guilds;
-        const adminGuildIds = adminGuilds.map(g => g.id);
-        
-        const { data: functionData, error: functionError } = await supabase.functions.invoke('get-common-guilds', {
-            body: { userGuildIds: adminGuildIds },
-        });
-        
-        if (functionError) {
-            throw new Error(`Failed to check server status: ${functionError.message}`);
-        }
-        
-        const commonGuildIds = new Set<string>(functionData.commonGuildIds);
-        setBotGuildIds(commonGuildIds);
-
-        adminGuilds.sort((a, b) => {
-            const aHasBot = commonGuildIds.has(a.id);
-            const bHasBot = commonGuildIds.has(b.id);
-            if (aHasBot && !bHasBot) return -1;
-            if (!aHasBot && bHasBot) return 1;
-            return a.name.localeCompare(b.name);
-        });
-
-        setGuilds(adminGuilds);
-        
-        const cacheValue = JSON.stringify({ guilds: adminGuilds, botGuildIds: Array.from(commonGuildIds) });
-        sessionStorage.setItem(cacheKey, cacheValue);
-
-      } catch (e: any) {
-        setError(e.message);
-        console.error("Error fetching guilds:", e);
-      } finally {
-        setLoading(false);
-        loadingRef.current = false;
+  const fetchAndProcessGuilds = async () => {
+    if (loadingRef.current || !session) return;
+    loadingRef.current = true;
+    setLoading(true);
+    setError(null);
+    setHasFetched(true);
+    
+    const cacheKey = `guilds-cache-${session.user.id}`;
+    
+    try {
+      const cachedData = sessionStorage.getItem(cacheKey);
+      if (cachedData) {
+          const { guilds: cachedGuilds, botGuildIds: cachedBotGuildIds } = JSON.parse(cachedData);
+          setGuilds(cachedGuilds);
+          setBotGuildIds(new Set(cachedBotGuildIds));
+          setLoading(false);
+          loadingRef.current = false;
+          return;
       }
-    };
 
-    fetchAndProcessGuilds();
-  }, [session]);
+      const { data: guildData, error: guildError } = await supabase.functions.invoke('get-guilds');
+      
+      if (guildError) {
+        sessionStorage.removeItem(cacheKey);
+        const errorBody = await guildError.context.json();
+        throw new Error(errorBody.error || 'An unknown error occurred while fetching servers.');
+      }
+
+      const adminGuilds: DiscordGuild[] = guildData.guilds;
+      const adminGuildIds = adminGuilds.map(g => g.id);
+      
+      const { data: functionData, error: functionError } = await supabase.functions.invoke('get-common-guilds', {
+          body: { userGuildIds: adminGuildIds },
+      });
+      
+      if (functionError) {
+          throw new Error(`Failed to check server status: ${functionError.message}`);
+      }
+      
+      const commonGuildIds = new Set<string>(functionData.commonGuildIds);
+      setBotGuildIds(commonGuildIds);
+
+      adminGuilds.sort((a, b) => {
+          const aHasBot = commonGuildIds.has(a.id);
+          const bHasBot = commonGuildIds.has(b.id);
+          if (aHasBot && !bHasBot) return -1;
+          if (!aHasBot && bHasBot) return 1;
+          return a.name.localeCompare(b.name);
+      });
+
+      setGuilds(adminGuilds);
+      
+      const cacheValue = JSON.stringify({ guilds: adminGuilds, botGuildIds: Array.from(commonGuildIds) });
+      sessionStorage.setItem(cacheKey, cacheValue);
+
+    } catch (e: any) {
+      setError(e.message);
+      console.error("Error fetching guilds:", e);
+    } finally {
+      setLoading(false);
+      loadingRef.current = false;
+    }
+  };
 
   const isAuthError = error && (error.toLowerCase().includes('authentication error') || error.toLowerCase().includes('discord connection expired'));
 
@@ -164,56 +157,66 @@ const ServerSelector: React.FC<ServerSelectorProps> = ({ session, onServerSelect
     `}</style>
     <div className="w-full max-w-lg animate-fade-in-up" style={{animationDelay: '150ms'}}>
         <div className="bg-nexus-surface/70 border border-white/5 rounded-xl p-4 backdrop-blur-sm min-h-[300px] flex flex-col">
-            {loading && (
+          {loading ? (
             <div className="flex-1 flex justify-center items-center">
                 <SpinnerIcon className="h-8 w-8 text-nexus-accent-primary" />
             </div>
-            )}
-
-            {error && (
-                <div className="flex-1 flex flex-col justify-center items-center text-center p-4">
-                    <p className="font-semibold text-nexus-danger">An Error Occurred</p>
-                    <p className="text-nexus-secondary-text text-sm mt-1 max-w-sm">{error}</p>
-                    {isAuthError && (
-                        <button
-                            onClick={onLogin}
-                            className="flex items-center justify-center gap-2 px-5 py-2 mt-4 text-sm font-medium text-white bg-gradient-to-br from-nexus-accent-start to-nexus-accent-glow rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-nexus-accent-primary focus:ring-offset-nexus-background transition-all duration-300 hover:scale-105 hover:shadow-[0_0_15px_rgba(0,180,255,0.3)]"
-                        >
-                            <LogInIcon className="h-4 w-4" />
-                            <span>Re-authenticate with Discord</span>
-                        </button>
-                    )}
+          ) : error ? (
+            <div className="flex-1 flex flex-col justify-center items-center text-center p-4">
+                <p className="font-semibold text-nexus-danger">An Error Occurred</p>
+                <p className="text-nexus-secondary-text text-sm mt-1 max-w-sm">{error}</p>
+                {isAuthError && (
+                    <button
+                        onClick={onLogin}
+                        className="flex items-center justify-center gap-2 px-5 py-2 mt-4 text-sm font-medium text-white bg-gradient-to-br from-nexus-accent-start to-nexus-accent-glow rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-nexus-accent-primary focus:ring-offset-nexus-background transition-all duration-300 hover:scale-105 hover:shadow-[0_0_15px_rgba(0,180,255,0.3)]"
+                    >
+                        <LogInIcon className="h-4 w-4" />
+                        <span>Re-authenticate with Discord</span>
+                    </button>
+                )}
+            </div>
+          ) : hasFetched ? (
+            guilds.length > 0 ? (
+                <div className="flex flex-col gap-3 max-h-[60vh] overflow-y-auto pr-2 server-list">
+                    {guilds.map((guild, index) => (
+                        <ServerListItem 
+                            key={guild.id}
+                            guild={guild}
+                            hasBot={botGuildIds.has(guild.id)}
+                            onSelect={onServerSelected}
+                            index={index}
+                        />
+                    ))}
                 </div>
-            )}
-            
-            {!loading && !error && (
-                guilds.length > 0 ? (
-                    <div className="flex flex-col gap-3 max-h-[60vh] overflow-y-auto pr-2 server-list">
-                        {guilds.map((guild, index) => (
-                            <ServerListItem 
-                                key={guild.id}
-                                guild={guild}
-                                hasBot={botGuildIds.has(guild.id)}
-                                onSelect={onServerSelected}
-                                index={index}
-                            />
-                        ))}
-                    </div>
-                ) : (
-                     <div className="flex-1 flex flex-col justify-center items-center text-center p-4">
-                        <p className="text-nexus-secondary-text">No servers found where you have admin permissions.</p>
-                         <a
-                          href={BOT_INVITE_URL}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex items-center justify-center gap-2 px-4 py-2 mt-4 text-sm font-medium text-white bg-nexus-surface border border-white/10 rounded-md hover:border-white/20 transition-colors"
-                        >
-                          <PlusIcon className="h-4 w-4" />
-                          <span>Invite Flamey to a Server</span>
-                        </a>
-                    </div>
-                )
-            )}
+            ) : (
+                  <div className="flex-1 flex flex-col justify-center items-center text-center p-4">
+                    <p className="text-nexus-secondary-text">No servers found where you have admin permissions.</p>
+                      <a
+                      href={BOT_INVITE_URL}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center justify-center gap-2 px-4 py-2 mt-4 text-sm font-medium text-white bg-nexus-surface border border-white/10 rounded-md hover:border-white/20 transition-colors"
+                    >
+                      <PlusIcon className="h-4 w-4" />
+                      <span>Invite Flamey to a Server</span>
+                    </a>
+                </div>
+            )
+          ) : (
+            <div className="flex-1 flex flex-col justify-center items-center text-center p-4">
+              <p className="text-nexus-primary-text font-medium mb-2">Ready to get started?</p>
+              <p className="text-nexus-secondary-text text-sm mb-6 max-w-xs">
+                We'll check for servers where you have admin permissions.
+              </p>
+              <button
+                onClick={fetchAndProcessGuilds}
+                className="group w-full sm:w-auto flex items-center justify-center gap-2.5 px-6 py-3 text-base font-semibold text-white bg-gradient-to-br from-nexus-accent-start to-nexus-accent-glow rounded-xl focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-nexus-accent-primary focus:ring-offset-nexus-background transition-all duration-300 hover:scale-105 hover:shadow-[0_0_20px_rgba(0,180,255,0.4)]"
+              >
+                <LayoutGridIcon className="h-5 w-5" />
+                <span>Fetch My Servers</span>
+              </button>
+            </div>
+          )}
         </div>
     </div>
     </>

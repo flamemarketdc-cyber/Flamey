@@ -1,136 +1,157 @@
-import React, { useState, useEffect, useCallback } from 'react'
-import type { Session } from '@supabase/supabase-js'
-import { supabase } from './lib/supabaseClient'
-import Header from './components/Header'
-import Homepage from './components/Homepage'
-import Dashboard from './components/Dashboard'
-import ServerSelectorPage from './components/ServerSelectorPage'
-import { DiscordGuild } from './types'
-import { SpinnerIcon } from './components/icons/Icons'
+import React, { useState, useEffect, useCallback } from 'react';
+import type { Session } from '@supabase/supabase-js';
+import { supabase } from './lib/supabaseClient';
+import Header from './components/Header';
+import Homepage from './components/Homepage';
+import Dashboard from './components/Dashboard';
+import ServerSelectorPage from './components/ServerSelectorPage';
+import { DiscordGuild } from './types';
+import { SpinnerIcon } from './components/icons/Icons';
 
-const getHashRoute = () => window.location.hash.substring(1) || '/'
+const getHashRoute = () => window.location.hash.substring(1) || '/';
 
 const App: React.FC = () => {
-  const [session, setSession] = useState<Session | null>(null)
-  const [selectedServer, setSelectedServer] = useState<DiscordGuild | null>(null)
-  const [route, setRoute] = useState(getHashRoute())
-  const [loading, setLoading] = useState(true)
+  const [session, setSession] = useState<Session | null>(null);
+  const [selectedServer, setSelectedServer] = useState<DiscordGuild | null>(null);
+  const [route, setRoute] = useState(getHashRoute());
+  const [loading, setLoading] = useState(true);
 
-  // --- Routing logic
+  // --- Router/Navigation Logic ---
   const navigate = useCallback((path: string) => {
-    window.location.hash = path
-  }, [])
+    window.location.hash = path;
+  }, []);
 
   useEffect(() => {
-    const handleHashChange = () => setRoute(getHashRoute())
-    window.addEventListener('hashchange', handleHashChange)
-    return () => window.removeEventListener('hashchange', handleHashChange)
-  }, [])
+    const handleHashChange = () => {
+      setRoute(getHashRoute());
+    };
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
 
-  // --- Dynamic page titles
+  // --- Update Document Title ---
   useEffect(() => {
-    document.title = route.startsWith('/dashboard')
+    const title = route.startsWith('/dashboard')
       ? 'Flamey | Dashboard'
-      : 'Flamey Discord Bot'
-  }, [route])
+      : 'Flamey Discord Bot';
+    document.title = title;
+  }, [route]);
 
-  // --- Session management
+  // --- Session Management ---
   useEffect(() => {
-    const initSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession()
-      setSession(session)
-      setLoading(false)
-    }
-    initSession()
+    const fetchSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      setSession(session);
+      setLoading(false);
+    };
+    fetchSession();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session)
+      setSession(session);
+
       if (!session) {
-        setSelectedServer(null)
-        localStorage.removeItem('lastSelectedServer')
-        sessionStorage.clear()
-        if (getHashRoute() !== '/') navigate('/')
+        setSelectedServer(null);
+        localStorage.removeItem('lastSelectedServer');
+        // Clear all session storage on logout to prevent any stale cache
+        sessionStorage.clear();
+        if (getHashRoute() !== '/') navigate('/');
       }
-    })
+    });
 
-    return () => subscription?.unsubscribe()
-  }, [navigate])
+    return () => {
+      subscription?.unsubscribe();
+    };
+  }, [navigate]);
 
-  // --- Restore last server when returning to dashboard
+  // --- Restore Server Selection ---
   useEffect(() => {
     if (session && route.startsWith('/dashboard') && !selectedServer) {
-      const last = localStorage.getItem('lastSelectedServer')
-      if (last) {
+      const lastServerJson = localStorage.getItem('lastSelectedServer');
+      if (lastServerJson) {
         try {
-          setSelectedServer(JSON.parse(last))
+          setSelectedServer(JSON.parse(lastServerJson));
         } catch {
-          localStorage.removeItem('lastSelectedServer')
-          navigate('/select-server')
+          localStorage.removeItem('lastSelectedServer');
+          navigate('/select-server');
         }
       } else {
-        navigate('/select-server')
+        navigate('/select-server');
       }
     }
-  }, [session, route, selectedServer, navigate])
+  }, [session, route, selectedServer, navigate]);
 
-  // --- Login with Discord
+  // --- LOGIN HANDLER (FIXED) ---
   const handleLogin = async () => {
-    const redirectURL = `${window.location.origin}/callback.html`
+    // Redirect to a dedicated callback page to isolate the Supabase client's
+    // token processing from the main React app's lifecycle and routing.
+    // This provides a "clean room" for the auth hash to be processed reliably.
+    const redirectURL = `${window.location.origin}/callback.html`;
+
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'discord',
       options: {
-        scopes: 'identify email guilds guilds.members.read',
+        scopes: 'identify email guilds',
+        // We ensure offline access is requested to get a refresh_token,
+        // which allows the session to be maintained. 'consent' is used to
+        // ensure the user re-approves permissions, fixing potential scope issues.
         queryParams: {
           prompt: 'consent',
           access_type: 'offline',
         },
         redirectTo: redirectURL,
       },
-    })
-    if (error) console.error('Login error:', error.message)
-  }
+    });
 
+    if (error) {
+      console.error('Error logging in:', error.message);
+    }
+  };
+
+  // --- LOGOUT HANDLER ---
   const handleLogout = async () => {
-    const { error } = await supabase.auth.signOut()
-    if (error) console.error('Logout error:', error.message)
-  }
+    const { error } = await supabase.auth.signOut();
+    if (error) console.error('Error logging out:', error.message);
+  };
 
+  // --- DASHBOARD NAVIGATION ---
   const handleDashboardClick = () => {
-    const last = localStorage.getItem('lastSelectedServer')
-    if (last) {
+    const lastServerJson = localStorage.getItem('lastSelectedServer');
+    if (lastServerJson) {
       try {
-        const server = JSON.parse(last) as DiscordGuild
-        setSelectedServer(server)
-        navigate('/dashboard')
+        const server = JSON.parse(lastServerJson) as DiscordGuild;
+        setSelectedServer(server);
+        navigate('/dashboard');
       } catch {
-        localStorage.removeItem('lastSelectedServer')
-        navigate('/select-server')
+        localStorage.removeItem('lastSelectedServer');
+        navigate('/select-server');
       }
-    } else navigate('/select-server')
-  }
+    } else {
+      navigate('/select-server');
+    }
+  };
 
   const handleServerSelected = (server: DiscordGuild) => {
-    setSelectedServer(server)
-    localStorage.setItem('lastSelectedServer', JSON.stringify(server))
-    navigate('/dashboard')
-  }
+    setSelectedServer(server);
+    localStorage.setItem('lastSelectedServer', JSON.stringify(server));
+    navigate('/dashboard');
+  };
 
   const handleGoToServerSelector = () => {
-    setSelectedServer(null)
-    localStorage.removeItem('lastSelectedServer')
-    navigate('/select-server')
-  }
+    setSelectedServer(null);
+    localStorage.removeItem('lastSelectedServer');
+    navigate('/select-server');
+  };
 
-  // --- Loading state
+  // --- LOADING STATE ---
   if (loading) {
     return (
       <div className="bg-transparent w-full h-full flex items-center justify-center">
         <SpinnerIcon className="h-8 w-8 text-nexus-accent-end" />
       </div>
-    )
+    );
   }
 
-  // --- Authenticated routing
+  // --- AUTH ROUTING ---
   if (session) {
     if (route.startsWith('/dashboard')) {
       if (selectedServer) {
@@ -144,13 +165,15 @@ const App: React.FC = () => {
             onServerSelected={handleServerSelected}
             onLogin={handleLogin}
           />
-        )
+        );
       }
+
+      // Show spinner while restoring state
       return (
         <div className="bg-transparent w-full h-full flex items-center justify-center">
           <SpinnerIcon className="h-8 w-8 text-nexus-accent-end" />
         </div>
-      )
+      );
     }
 
     if (route === '/select-server') {
@@ -161,11 +184,11 @@ const App: React.FC = () => {
           onLogin={handleLogin}
           onLogout={handleLogout}
         />
-      )
+      );
     }
   }
 
-  // --- Public homepage
+  // --- PUBLIC HOMEPAGE ---
   return (
     <div className="bg-transparent text-nexus-primary-text min-h-screen">
       <Header
@@ -178,7 +201,7 @@ const App: React.FC = () => {
         <Homepage onLogin={handleLogin} />
       </main>
     </div>
-  )
-}
+  );
+};
 
-export default App
+export default App;

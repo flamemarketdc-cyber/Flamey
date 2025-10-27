@@ -12,6 +12,7 @@ interface ServerSelectorPageProps {
 
 const ServerSelectorPage: React.FC<ServerSelectorPageProps> = ({ session, onServerSelected, onLogin, onLogout }) => {
   const logoUrl = 'https://media.discordapp.net/attachments/1409211763253051519/1431960946464653523/ChatGPT_Image_Oct_26__2025__03_09_04_PM-removebg.png?ex=68ff510e&is=68fdff8e&hm=6bfb1d8007bbbb8758d7f3bbbfc35a78d603e9455b3156289ac0342c6f95d021&=&format=webp&quality=lossless&width=842&height=842';
+  const userName = session.user.user_metadata?.name || 'User';
   
   return (
     <div className="min-h-screen bg-transparent flex flex-col items-center justify-center p-4 selection:bg-nexus-accent-primary/20">
@@ -24,8 +25,12 @@ const ServerSelectorPage: React.FC<ServerSelectorPageProps> = ({ session, onServ
        
       <main className="w-full flex flex-col items-center justify-center text-center px-4">
         <div className="animate-fade-in-up" style={{ animationDelay: '50ms' }}>
-          <h1 className="text-4xl sm:text-5xl font-black tracking-tighter text-nexus-primary-text mb-3">Select a Server</h1>
-          <p className="max-w-md mx-auto text-nexus-secondary-text">Choose a server you'd like to configure. Only servers where you have <span className="text-nexus-primary-text font-medium">Administrator</span> permissions are shown.</p>
+          <h1 className="text-4xl sm:text-5xl font-black tracking-tighter text-nexus-primary-text mb-3">
+            Welcome, <span className="text-gradient-blue">{userName}</span>!
+          </h1>
+          <p className="max-w-md mx-auto text-nexus-secondary-text">
+            You're successfully logged in. Click the button below to find your servers.
+          </p>
         </div>
         
         <ServerSelector 
