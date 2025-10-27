@@ -10,9 +10,21 @@ import { SpinnerIcon } from './components/icons/Icons';
 
 const getHashRoute = () => window.location.hash.substring(1) || '/';
 
+const getInitialServer = (): DiscordGuild | null => {
+  const serverJson = localStorage.getItem('lastSelectedServer');
+  if (!serverJson) return null;
+  try {
+    return JSON.parse(serverJson) as DiscordGuild;
+  } catch (e) {
+    console.error("Failed to parse server from localStorage", e);
+    localStorage.removeItem('lastSelectedServer');
+    return null;
+  }
+};
+
 const App: React.FC = () => {
   const [session, setSession] = useState<Session | null>(null);
-  const [selectedServer, setSelectedServer] = useState<DiscordGuild | null>(null);
+  const [selectedServer, setSelectedServer] = useState<DiscordGuild | null>(getInitialServer());
   const [route, setRoute] = useState(getHashRoute());
   const [loading, setLoading] = useState(true);
 
@@ -100,22 +112,15 @@ const App: React.FC = () => {
     }
   }, [session]);
 
-  // --- Restore Server Selection ---
+  // --- Navigation & State Sync Logic ---
   useEffect(() => {
-    if (session && route.startsWith('/dashboard') && !selectedServer) {
-      const lastServerJson = localStorage.getItem('lastSelectedServer');
-      if (lastServerJson) {
-        try {
-          setSelectedServer(JSON.parse(lastServerJson));
-        } catch {
-          localStorage.removeItem('lastSelectedServer');
-          navigate('/select-server');
-        }
-      } else {
-        navigate('/select-server');
-      }
+    if (session && !selectedServer && route.startsWith('/dashboard')) {
+      // If user is logged in, trying to access dashboard, but no server is selected (e.g. from localStorage)
+      // then redirect them to select one.
+      navigate('/select-server');
     }
-  }, [session, route, selectedServer, navigate]);
+  }, [session, selectedServer, route, navigate]);
+
 
   // --- LOGIN HANDLER ---
   const handleLogin = async () => {
@@ -140,18 +145,11 @@ const App: React.FC = () => {
 
   // --- DASHBOARD NAVIGATION ---
   const handleDashboardClick = () => {
-    const lastServerJson = localStorage.getItem('lastSelectedServer');
-    if (lastServerJson) {
-      try {
-        const server = JSON.parse(lastServerJson) as DiscordGuild;
-        setSelectedServer(server);
+    // Relies on selectedServer state which is now initialized from localStorage
+    if (selectedServer) {
         navigate('/dashboard');
-      } catch {
-        localStorage.removeItem('lastSelectedServer');
-        navigate('/select-server');
-      }
     } else {
-      navigate('/select-server');
+        navigate('/select-server');
     }
   };
 
@@ -162,8 +160,6 @@ const App: React.FC = () => {
   };
 
   const handleGoToServerSelector = () => {
-    setSelectedServer(null);
-    localStorage.removeItem('lastSelectedServer');
     navigate('/select-server');
   };
 
@@ -178,6 +174,17 @@ const App: React.FC = () => {
 
   // --- AUTH ROUTING ---
   if (session) {
+    if (route === '/select-server') {
+      return (
+        <ServerSelectorPage
+          session={session}
+          onServerSelected={handleServerSelected}
+          onLogin={handleLogin}
+          onLogout={handleLogout}
+        />
+      );
+    }
+
     if (route.startsWith('/dashboard')) {
       if (selectedServer) {
         return (
@@ -192,23 +199,13 @@ const App: React.FC = () => {
           />
         );
       }
-
-      // Show spinner while restoring state
+      
+      // If no server is selected, the useEffect above will navigate away.
+      // Show a loader in the meantime.
       return (
         <div className="bg-transparent w-full h-full flex items-center justify-center">
           <SpinnerIcon className="h-8 w-8 text-nexus-accent-end" />
         </div>
-      );
-    }
-
-    if (route === '/select-server') {
-      return (
-        <ServerSelectorPage
-          session={session}
-          onServerSelected={handleServerSelected}
-          onLogin={handleLogin}
-          onLogout={handleLogout}
-        />
       );
     }
   }

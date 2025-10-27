@@ -16,14 +16,11 @@ const ServerSelectorPage: React.FC<ServerSelectorPageProps> = ({ session, onServ
   return (
     <div className="min-h-screen bg-transparent flex flex-col items-center justify-center p-4 selection:bg-nexus-accent-primary/20">
       <main className="w-full flex flex-col items-center justify-center text-center px-4">
-        <div className="flex flex-col items-center gap-4 mb-8 animate-fade-in-up" style={{ animationDelay: '50ms' }}>
-          <a href="#/" className="flex items-center gap-2.5 no-underline text-nexus-primary-text transition-opacity hover:opacity-80">
-              <img src={logoUrl} alt="Flamey Logo" className="h-10 w-10" />
-              <span className="text-2xl font-bold tracking-tight">Flamey</span>
+        <div className="flex flex-col items-center gap-4 mb-10 animate-fade-in-up" style={{ animationDelay: '50ms' }}>
+          <a href="#/" className="flex items-center gap-4 no-underline text-nexus-primary-text transition-opacity hover:opacity-80">
+              <img src={logoUrl} alt="Flamey Logo" className="h-14 w-14" />
+              <span className="text-4xl font-bold tracking-tight">Flamey</span>
           </a>
-          <h1 className="text-4xl font-black tracking-tighter text-nexus-primary-text">
-            Select a Server
-          </h1>
         </div>
         
         <ServerSelector 
