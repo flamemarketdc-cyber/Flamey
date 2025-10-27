@@ -12,94 +12,175 @@ async function getUserIdFromRequest(req: Request, supabaseClient: SupabaseClient
     return user.id;
 }
 
-declare const Deno: any;
+interface DiscordTokenResponse {
+  access_token: string;
+  refresh_token: string;
+  expires_in: number;
+  scope: string;
+  token_type: string;
+}
 
-Deno.serve(async (req: Request) => {
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
-  }
+// Function to refresh the Discord token
+async function refreshDiscordToken(refreshToken: string): Promise<DiscordTokenResponse> {
+    const DISCORD_CLIENT_ID = Deno.env.get('DISCORD_CLIENT_ID');
+    const DISCORD_CLIENT_SECRET = Deno.env.get('DISCORD_CLIENT_SECRET');
 
-  try {
-    const supabaseUrl = Deno.env.get('SUPABASE_URL');
-    const anonKey = Deno.env.get('SUPABASE_ANON_KEY');
-    const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-
-    if (!supabaseUrl || !anonKey || !serviceKey) {
-        throw new Error('Server configuration error: Missing Supabase environment variables.');
+    if (!DISCORD_CLIENT_ID || !DISCORD_CLIENT_SECRET) {
+        throw new Error('Server configuration error: Missing Discord client credentials.');
     }
 
-    // Create a standard client to securely verify the user's JWT from the request
-    const supabaseClient = createClient(supabaseUrl, anonKey, {
-      global: { headers: { Authorization: req.headers.get('Authorization')! } },
+    const response = await fetch('https://discord.com/api/v10/oauth2/token', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({
+            client_id: DISCORD_CLIENT_ID,
+            client_secret: DISCORD_CLIENT_SECRET,
+            grant_type: 'refresh_token',
+            refresh_token: refreshToken,
+        }),
     });
 
-    const userId = await getUserIdFromRequest(req, supabaseClient);
-
-    // ✅ FIX: Create a service role client configured to query the 'auth' schema directly.
-    const serviceClient = createClient(supabaseUrl, serviceKey, {
-        db: {
-            schema: 'auth'
-        }
-    });
-    
-    // Directly query the auth.identities table for the user's Discord provider_token.
-    const { data: identity, error: identityError } = await serviceClient
-      .from('identities') // This now correctly targets 'auth.identities'
-      .select('provider_token')
-      .eq('user_id', userId)
-      .eq('provider', 'discord')
-      .single();
-
-    if (identityError || !identity?.provider_token) {
-        console.error('Identity lookup error:', identityError);
-        // This is the most likely failure point. Give a very specific and helpful error.
-        throw new Error('Authentication error: Could not find a stored Discord token for your user. This is likely because the "guilds" permission was not granted. Please log out, log back in, and ensure you approve all requested Discord permissions.');
+    if (!response.ok) {
+        const errorData = await response.json();
+        console.error('Discord token refresh failed:', errorData);
+        // If refresh fails, the user must re-authenticate.
+        throw new Error('Authentication error: Your Discord connection has expired and could not be refreshed. Please log out and log back in.');
     }
 
-    const providerToken = identity.provider_token;
-    
-    // Use the retrieved token to fetch guilds from the Discord API
+    return await response.json();
+}
+
+async function fetchDiscordGuilds(accessToken: string): Promise<any[]> {
     const discordResponse = await fetch('https://discord.com/api/users/@me/guilds', {
-      headers: {
-        Authorization: `Bearer ${providerToken}`,
-      },
+        headers: {
+            Authorization: `Bearer ${accessToken}`,
+        },
     });
 
     if (!discordResponse.ok) {
-        const errorText = await discordResponse.text();
-        if (discordResponse.status === 401) {
-            // The token we found is invalid or has expired.
-             throw new Error('Authentication error: The stored Discord token is invalid or has expired. Please log out and back in to refresh it.');
-        }
-        throw new Error(`Discord API Error: ${errorText}`);
+        // We'll let the caller handle the error, especially the 401 case
+        const errorResponse = { status: discordResponse.status, text: await discordResponse.text() };
+        throw errorResponse;
     }
 
-    const guilds = await discordResponse.json();
-    
-    // Filter for guilds where the user has Admin permissions or is the owner
-    const manageableGuilds = guilds.filter((guild: any) => {
-        try {
-            if (guild.owner === true) return true;
-            if (typeof guild.permissions === 'string') {
-                const permissions = BigInt(guild.permissions);
-                return (permissions & 0x8n) === 0x8n;
-            }
-            return false;
-        } catch(e) {
-            console.error(`Failed to parse permissions for guild ${guild.id}:`, guild.permissions, e);
-            return false;
-        }
-    });
+    return await discordResponse.json();
+}
 
-    return new Response(JSON.stringify({ guilds: manageableGuilds }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 200,
-    });
-  } catch (error) {
-    const status = error.message.startsWith('Authentication error') ? 401 : 400;
-    return new Response(JSON.stringify({ error: error.message }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: status,
-    });
-  }
+declare const Deno: any;
+
+Deno.serve(async (req: Request) => {
+    if (req.method === 'OPTIONS') {
+        return new Response('ok', { headers: corsHeaders });
+    }
+    
+    let supabaseClient: SupabaseClient | null = null;
+    let serviceClient: SupabaseClient | null = null;
+    let userId: string | null = null;
+
+    try {
+        const supabaseUrl = Deno.env.get('SUPABASE_URL');
+        const anonKey = Deno.env.get('SUPABASE_ANON_KEY');
+        const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+
+        if (!supabaseUrl || !anonKey || !serviceKey) {
+            throw new Error('Server configuration error: Missing Supabase environment variables.');
+        }
+
+        supabaseClient = createClient(supabaseUrl, anonKey, {
+            global: { headers: { Authorization: req.headers.get('Authorization')! } },
+        });
+
+        userId = await getUserIdFromRequest(req, supabaseClient);
+
+        serviceClient = createClient(supabaseUrl, serviceKey, {
+            db: { schema: 'auth' }
+        });
+        
+        // 1. Fetch current tokens from the database
+        const { data: identity, error: identityError } = await serviceClient
+            .from('identities')
+            .select('provider_token, provider_refresh_token, id') // Select id to update the record later
+            .eq('user_id', userId)
+            .eq('provider', 'discord')
+            .single();
+
+        if (identityError || !identity) {
+            console.error('Identity lookup error:', identityError);
+            throw new Error('Authentication error: Could not find Discord credentials for your user. Please log out and log back in, ensuring you approve all permissions.');
+        }
+
+        let { provider_token: accessToken, provider_refresh_token: refreshToken, id: identityId } = identity;
+
+        if (!refreshToken) {
+            // This is a critical issue. The user did not grant offline access.
+            throw new Error('Authentication error: Missing refresh token. Please log out and log back in, ensuring you approve all permissions for offline access.');
+        }
+
+        let guilds;
+        try {
+            // 2. Try fetching guilds with the current access token
+            guilds = await fetchDiscordGuilds(accessToken!);
+        } catch (error: any) {
+            // 3. If it fails with a 401, the token is expired. Refresh it.
+            if (error.status === 401) {
+                console.log('Access token expired. Refreshing...');
+                const newTokens = await refreshDiscordToken(refreshToken);
+
+                // 4. Update the tokens in the database
+                const { error: updateError } = await serviceClient
+                    .from('identities')
+                    .update({
+                        provider_token: newTokens.access_token,
+                        provider_refresh_token: newTokens.refresh_token,
+                    })
+                    .eq('id', identityId);
+
+                if (updateError) {
+                    // This is bad, but we can still proceed with the new token for this request
+                    console.error('Failed to update new tokens in database:', updateError);
+                } else {
+                    console.log('Successfully updated tokens in database.');
+                }
+                
+                // 5. Retry fetching guilds with the new access token
+                accessToken = newTokens.access_token;
+                guilds = await fetchDiscordGuilds(accessToken);
+                
+            } else {
+                // For other errors (e.g., 500 from Discord), just re-throw
+                throw new Error(`Discord API Error: ${error.text}`);
+            }
+        }
+        
+        // 6. Filter for guilds where the user has Admin permissions or is the owner
+        const manageableGuilds = guilds.filter((guild: any) => {
+            try {
+                if (guild.owner === true) return true;
+                if (typeof guild.permissions === 'string') {
+                    const permissions = BigInt(guild.permissions);
+                    return (permissions & 0x8n) === 0x8n; // ADMINISTRATOR permission
+                }
+                return false;
+            } catch(e) {
+                console.error(`Failed to parse permissions for guild ${guild.id}:`, guild.permissions, e);
+                return false;
+            }
+        });
+
+        return new Response(JSON.stringify({ guilds: manageableGuilds }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 200,
+        });
+
+    } catch (error) {
+        const isAuthError = error.message.startsWith('Authentication error');
+        const status = isAuthError ? 401 : 500;
+        console.error(`Error in get-guilds function (status ${status}):`, error.message);
+        return new Response(JSON.stringify({ error: error.message }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: status,
+        });
+    }
 });

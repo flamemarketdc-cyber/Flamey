@@ -57,11 +57,8 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({ session, onLogout, se
         const { data: guildData, error: guildError } = await supabase.functions.invoke('get-guilds');
         
         if (guildError) {
-          if (guildError.context?.status === 401 || guildError.message.includes('expired')) {
-              throw new Error('Discord connection expired. Please log in again.');
-          }
-          const functionError = await guildError.context.json().catch(() => ({}));
-          throw new Error(functionError.error || 'Failed to fetch guilds. Please refresh the page.');
+          const errorBody = await guildError.context.json();
+          throw new Error(errorBody.error || 'An unknown error occurred while fetching guilds.');
         }
 
         const adminGuilds: DiscordGuild[] = guildData.guilds;

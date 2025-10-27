@@ -94,11 +94,8 @@ const ServerSelector: React.FC<ServerSelectorProps> = ({ session, onServerSelect
         
         if (guildError) {
           sessionStorage.removeItem(cacheKey); // IMPORTANT: Clear cache on any failure
-          if (guildError.context?.status === 401 || guildError.message.includes('expired')) {
-              throw new Error('Discord connection expired. Please log in again to select a server.');
-          }
-          const functionError = await guildError.context.json().catch(() => ({}));
-          throw new Error(functionError.error || 'Failed to load servers. Please try again.');
+          const errorBody = await guildError.context.json();
+          throw new Error(errorBody.error || 'An unknown error occurred while fetching servers.');
         }
 
         const adminGuilds: DiscordGuild[] = guildData.guilds;
