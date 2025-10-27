@@ -7,6 +7,11 @@ const baseCardStyles = 'bg-nexus-surface border border-white/5 rounded-xl';
 const hoverCardStyles = 'hover:border-nexus-accent-primary/30';
 const formInputStyles = "w-full bg-nexus-overlay border border-white/10 rounded-lg px-4 py-2.5 text-sm text-nexus-primary-text placeholder-nexus-secondary-text/50 focus:border-nexus-accent-primary focus:bg-nexus-surface focus:outline-none focus:ring-2 focus:ring-nexus-accent-primary/20 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed";
 
+interface ContentComponentProps {
+    server: DiscordGuild;
+    onUnsavedChangesChange: (hasChanges: boolean) => void;
+}
+
 const Card: React.FC<{ children: React.ReactNode; className?: string; interactive?: boolean }> = ({ children, className = '', interactive = false }) => (
   <div className={`${baseCardStyles} ${interactive ? hoverCardStyles : ''} ${className} shadow-[0_0_10px_rgba(0,180,255,0.05)]`}>
     {children}
@@ -37,7 +42,7 @@ const ToggleSwitch: React.FC<{ enabled: boolean; onChange: (enabled: boolean) =>
 
 const SaveBar: React.FC<{ isVisible: boolean; onSave: () => void; onReset: () => void; isSaving: boolean }> = ({ isVisible, onSave, onReset, isSaving }) => (
     <div className={`sticky bottom-0 left-0 right-0 w-full transition-all duration-500 ease-in-out ${isVisible ? 'translate-y-0 opacity-100' : 'translate-y-full opacity-0 pointer-events-none'}`}>
-        <div className="max-w-4xl mx-auto p-2">
+        <div className="max-w-4xl mx-auto p-4">
              <div className="flex items-center justify-between gap-4 p-4 rounded-xl bg-nexus-overlay/80 backdrop-blur-lg border border-white/10 shadow-2xl shadow-black/50">
                  <p className="font-medium text-sm text-nexus-accent-glow">You have unsaved changes!</p>
                  <div className="flex items-center gap-3">
@@ -63,7 +68,11 @@ const SaveBar: React.FC<{ isVisible: boolean; onSave: () => void; onReset: () =>
 );
 
 
-const DashboardHome: React.FC<{ server: DiscordGuild }> = ({ server }) => {
+const DashboardHome: React.FC<ContentComponentProps> = ({ server, onUnsavedChangesChange }) => {
+    useEffect(() => {
+        onUnsavedChangesChange(false);
+    }, [onUnsavedChangesChange]);
+
     const serverIconUrl = server.icon
     ? `https://cdn.discordapp.com/icons/${server.id}/${server.icon}.webp?size=128`
     : `https://cdn.discordapp.com/embed/avatars/${parseInt(server.id.slice(-1)) % 5}.png`;
@@ -88,28 +97,65 @@ const DashboardHome: React.FC<{ server: DiscordGuild }> = ({ server }) => {
 };
 
 
-const MessagesContent: React.FC<{server: DiscordGuild}> = ({server}) => {
-    const [welcomeEnabled, setWelcomeEnabled] = useState(true);
-    const [goodbyeEnabled, setGoodbyeEnabled] = useState(false);
+const MessagesContent: React.FC<ContentComponentProps> = ({server, onUnsavedChangesChange}) => {
+    type Config = {
+        welcomeEnabled: boolean;
+        goodbyeEnabled: boolean;
+        welcomeChannel: string;
+        welcomeMessage: string;
+    };
+    
+    // In a real app, this would be fetched. For now, we mock it.
+    const MOCKED_INITIAL_CONFIG: Config = {
+        welcomeEnabled: true,
+        goodbyeEnabled: false,
+        welcomeChannel: "general", // This should be a channel ID in a real app
+        welcomeMessage: "Welcome {user.mention} to {server.name}!",
+    };
+
+    const [config, setConfig] = useState<Config>(MOCKED_INITIAL_CONFIG);
+    const [initialConfig, setInitialConfig] = useState<Config>(MOCKED_INITIAL_CONFIG);
+    const [isSaving, setIsSaving] = useState(false);
+
+    const isUnchanged = JSON.stringify(config) === JSON.stringify(initialConfig);
+
+    useEffect(() => {
+        onUnsavedChangesChange(!isUnchanged);
+    }, [isUnchanged, onUnsavedChangesChange]);
+    
+    // Cleanup on unmount
+    useEffect(() => () => onUnsavedChangesChange(false), [onUnsavedChangesChange]);
+    
+    const handleSave = () => {
+        setIsSaving(true);
+        console.log("Saving...", config);
+        // Simulate API call
+        setTimeout(() => {
+            setInitialConfig(config);
+            setIsSaving(false);
+        }, 1500);
+    };
+
+    const handleReset = () => setConfig(initialConfig);
 
     return (
         <div className="animate-fade-in-up">
             <Title>Welcome & Goodbye Messages</Title>
             <div className="space-y-6">
                 <Card className="p-6">
-                    <ToggleSwitch enabled={welcomeEnabled} onChange={setWelcomeEnabled} label="Enable Welcome Messages" />
-                    {welcomeEnabled && (
+                    <ToggleSwitch enabled={config.welcomeEnabled} onChange={val => setConfig(p => ({...p, welcomeEnabled: val}))} label="Enable Welcome Messages" />
+                    {config.welcomeEnabled && (
                         <div className="mt-6 space-y-4 border-t border-white/5 pt-6">
                             <div>
                                 <label className="block text-sm font-medium text-nexus-secondary-text mb-2">Welcome Channel</label>
-                                <select className={formInputStyles}>
-                                    <option>#general</option>
-                                    <option>#welcome</option>
+                                <select className={formInputStyles} value={config.welcomeChannel} onChange={e => setConfig(p => ({...p, welcomeChannel: e.target.value}))}>
+                                    <option value="general">#general</option>
+                                    <option value="welcome">#welcome</option>
                                 </select>
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-nexus-secondary-text mb-2">Welcome Message</label>
-                                <textarea className={`${formInputStyles} h-32`} defaultValue="Welcome {user.mention} to {server.name}!"></textarea>
+                                <textarea className={`${formInputStyles} h-32`} value={config.welcomeMessage} onChange={e => setConfig(p => ({...p, welcomeMessage: e.target.value}))}></textarea>
                                 <p className="text-xs text-gray-500 mt-2">Placeholders: `{'user.mention'}` `{'user.name'}` `{'server.name'}`</p>
                             </div>
                             <button className="px-5 py-2 text-sm font-medium text-nexus-accent-glow bg-nexus-accent-primary/10 border border-nexus-accent-primary/20 rounded-lg hover:bg-nexus-accent-primary/20 hover:text-white transition-colors">
@@ -119,19 +165,28 @@ const MessagesContent: React.FC<{server: DiscordGuild}> = ({server}) => {
                     )}
                 </Card>
                 <Card className="p-6">
-                     <ToggleSwitch enabled={goodbyeEnabled} onChange={setGoodbyeEnabled} label="Enable Goodbye Messages" />
+                     <ToggleSwitch enabled={config.goodbyeEnabled} onChange={val => setConfig(p => ({...p, goodbyeEnabled: val}))} label="Enable Goodbye Messages" />
                 </Card>
             </div>
-             <SaveBar isVisible={true} onSave={() => {}} onReset={() => {}} isSaving={false} />
+             <SaveBar isVisible={!isUnchanged} onSave={handleSave} onReset={handleReset} isSaving={isSaving} />
         </div>
     );
 }
 
-const GeneralSettings: React.FC<{server: DiscordGuild}> = ({ server }) => {
+const GeneralSettings: React.FC<ContentComponentProps> = ({ server, onUnsavedChangesChange }) => {
     const [prefix, setPrefix] = useState(',');
     const [initialPrefix, setInitialPrefix] = useState(',');
     const [status, setStatus] = useState<'idle' | 'loading' | 'saving' | 'success' | 'error'>('loading');
     const [error, setError] = useState('');
+
+    const isUnchanged = prefix === initialPrefix;
+
+    useEffect(() => {
+        onUnsavedChangesChange(!isUnchanged);
+    }, [isUnchanged, onUnsavedChangesChange]);
+
+     // Cleanup on unmount
+    useEffect(() => () => onUnsavedChangesChange(false), [onUnsavedChangesChange]);
 
     useEffect(() => {
         const fetchPrefix = async () => {
@@ -174,8 +229,6 @@ const GeneralSettings: React.FC<{server: DiscordGuild}> = ({ server }) => {
             setTimeout(() => setStatus('idle'), 2000);
         }
     };
-
-    const isUnchanged = prefix === initialPrefix;
     
     if (status === 'loading') {
         return (
@@ -225,7 +278,7 @@ const HowItWorksItem: React.FC<{ icon: React.ReactNode; title: string; children:
     </div>
 );
 
-const AIChatbotContent: React.FC<{ server: DiscordGuild }> = ({ server }) => {
+const AIChatbotContent: React.FC<ContentComponentProps> = ({ server, onUnsavedChangesChange }) => {
     const BOT_INVITE_URL = 'https://discord.com/oauth2/authorize?client_id=1430883691944738958&permissions=1101596716286&scope=bot%20applications.commands';
     
     type Config = {
@@ -247,6 +300,15 @@ const AIChatbotContent: React.FC<{ server: DiscordGuild }> = ({ server }) => {
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     const [channelSearch, setChannelSearch] = useState('');
     const dropdownRef = useRef<HTMLDivElement>(null);
+
+    const isUnchanged = JSON.stringify(config) === JSON.stringify(initialConfig);
+
+    useEffect(() => {
+        onUnsavedChangesChange(!isUnchanged);
+    }, [isUnchanged, onUnsavedChangesChange]);
+
+     // Cleanup on unmount
+    useEffect(() => () => onUnsavedChangesChange(false), [onUnsavedChangesChange]);
 
     useEffect(() => {
         if (!guildId) return;
@@ -328,7 +390,6 @@ const AIChatbotContent: React.FC<{ server: DiscordGuild }> = ({ server }) => {
         }
     };
 
-    const isUnchanged = JSON.stringify(config) === JSON.stringify(initialConfig);
     const selectedChannel = channels.find(c => c.id === config.autoChannel);
     const filteredChannels = channels.filter(c => c.name.toLowerCase().includes(channelSearch.toLowerCase()));
 
@@ -468,38 +529,45 @@ const AIChatbotContent: React.FC<{ server: DiscordGuild }> = ({ server }) => {
 };
 
 
-const PlaceholderContent: React.FC<{title: string}> = ({title}) => (
+const PlaceholderContent: React.FC<{title: string} & ContentComponentProps> = ({title, onUnsavedChangesChange}) => {
+    useEffect(() => {
+        onUnsavedChangesChange(false);
+    }, [onUnsavedChangesChange]);
+
+    return (
      <div className="animate-fade-in-up">
         <Title>{title}</Title>
         <Card className="p-8">
             <p className="text-nexus-secondary-text text-center">Configuration for {title} will be available here soon.</p>
         </Card>
     </div>
-)
+    )
+}
 
-const componentMap: Record<Feature, React.ComponentType<{server: DiscordGuild}>> = {
+const componentMap: Record<Feature, React.ComponentType<ContentComponentProps>> = {
     dashboard_home: DashboardHome,
     general_settings: GeneralSettings,
-    commands: () => <PlaceholderContent title="Commands" />,
-    messages: (props) => <MessagesContent {...props} />,
-    custom_branding: () => <PlaceholderContent title="Custom Branding" />,
-    ticket_system: () => <PlaceholderContent title="Ticket System" />,
-    auto_moderation: () => <PlaceholderContent title="Auto Moderation"/>,
-    giveaways: () => <PlaceholderContent title="Giveaways"/>,
-    giveaways_claimtime: () => <PlaceholderContent title="Giveaway Claim Time" />,
-    logging: () => <PlaceholderContent title="Logging"/>,
+    commands: (props) => <PlaceholderContent title="Commands" {...props} />,
+    messages: MessagesContent,
+    custom_branding: (props) => <PlaceholderContent title="Custom Branding" {...props} />,
+    ticket_system: (props) => <PlaceholderContent title="Ticket System" {...props} />,
+    auto_moderation: (props) => <PlaceholderContent title="Auto Moderation" {...props}/>,
+    giveaways: (props) => <PlaceholderContent title="Giveaways" {...props}/>,
+    giveaways_claimtime: (props) => <PlaceholderContent title="Giveaway Claim Time" {...props} />,
+    logging: (props) => <PlaceholderContent title="Logging" {...props}/>,
     ai_chatbot: AIChatbotContent,
-    leveling: () => <PlaceholderContent title="Leveling" />,
+    leveling: (props) => <PlaceholderContent title="Leveling" {...props} />,
 };
 
 interface DashboardContentProps {
   feature: Feature;
   server: DiscordGuild;
+  onUnsavedChangesChange: (hasChanges: boolean) => void;
 }
 
-const DashboardContent: React.FC<DashboardContentProps> = ({ feature, server }) => {
+const DashboardContent: React.FC<DashboardContentProps> = ({ feature, server, onUnsavedChangesChange }) => {
   const ContentComponent = componentMap[feature] || DashboardHome;
-  return <ContentComponent server={server} />;
+  return <ContentComponent server={server} onUnsavedChangesChange={onUnsavedChangesChange} />;
 };
 
 export default DashboardContent;

@@ -8,12 +8,15 @@ interface SidebarProps {
   setActiveFeature: (feature: Feature) => void;
   isOpen: boolean;
   setIsOpen: (isOpen: boolean) => void;
+  isNavDisabled: boolean;
 }
 
 const SidebarContent: React.FC<{
     activeFeature: Feature; 
-    setActiveFeature: (feature: Feature) => void; 
-}> = ({ activeFeature, setActiveFeature }) => {
+    setActiveFeature: (feature: Feature) => void;
+    isNavDisabled: boolean;
+    onMobileNav: () => void;
+}> = ({ activeFeature, setActiveFeature, isNavDisabled, onMobileNav }) => {
     const [openDropdown, setOpenDropdown] = useState<Feature | null>(() => {
         for (const item of navItems) {
             if (item.type === 'dropdown' && item.children.some(child => child.id === activeFeature)) {
@@ -25,6 +28,7 @@ const SidebarContent: React.FC<{
     
     const handleNavClick = (feature: Feature) => {
       setActiveFeature(feature);
+      onMobileNav();
     };
 
     const handleDropdownClick = (feature: Feature) => {
@@ -69,19 +73,23 @@ const SidebarContent: React.FC<{
                     </button>
                     {isOpen && (
                         <div className="pl-6 pt-1 pb-1 space-y-1 mt-1 border-l-2 border-white/5 ml-5">
-                            {item.children.map(child => (
+                            {item.children.map(child => {
+                                const isChildActive = activeFeature === child.id;
+                                const isChildDisabled = isNavDisabled && !isChildActive;
+                                return (
                                 <button
                                     key={child.id}
                                     onClick={() => handleNavClick(child.id)}
+                                    disabled={isChildDisabled}
                                     className={`w-full text-left text-sm rounded-md px-4 py-2 transition-colors ${
-                                        activeFeature === child.id
+                                        isChildActive
                                             ? 'text-nexus-accent-primary font-semibold'
-                                            : 'text-nexus-secondary-text hover:text-nexus-accent-primary/80'
+                                            : `text-nexus-secondary-text ${isChildDisabled ? 'opacity-50 cursor-not-allowed' : 'hover:text-nexus-accent-primary/80'}`
                                     }`}
                                 >
                                     {child.name}
                                 </button>
-                            ))}
+                            )})}
                         </div>
                     )}
                  </div>
@@ -89,14 +97,16 @@ const SidebarContent: React.FC<{
             }
 
             const isActive = activeFeature === item.id;
+            const isDisabled = isNavDisabled && !isActive;
             return (
               <button
                 key={item.id}
                 onClick={() => handleNavClick(item.id)}
+                disabled={isDisabled}
                 className={`w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg transition-all duration-200 ease-in-out group relative border-l-4 ${
                   isActive
                     ? 'bg-nexus-hover text-nexus-accent-primary border-nexus-accent-primary'
-                    : 'text-nexus-secondary-text hover:bg-white/5 hover:text-nexus-primary-text border-transparent'
+                    : `text-nexus-secondary-text border-transparent ${isDisabled ? 'opacity-50 cursor-not-allowed' : 'hover:bg-white/5 hover:text-nexus-primary-text'}`
                 }`}
               >
                 <span className={`transition-colors duration-200 ${isActive ? 'text-nexus-accent-primary' : 'text-nexus-secondary-text/70 group-hover:text-nexus-secondary-text'}`}>{item.icon}</span>
@@ -110,7 +120,7 @@ const SidebarContent: React.FC<{
     );
 };
 
-const Sidebar: React.FC<SidebarProps> = ({ activeFeature, setActiveFeature, isOpen, setIsOpen }) => {
+const Sidebar: React.FC<SidebarProps> = ({ activeFeature, setActiveFeature, isOpen, setIsOpen, isNavDisabled }) => {
   const logoUrl = 'https://media.discordapp.net/attachments/1409211763253051519/1431960946464653523/ChatGPT_Image_Oct_26__2025__03_09_04_PM-removebg.png?ex=6900a28e&is=68ff510e&hm=55362ed4d121e81fe0dc951403a97ab16d1a2eaa3665fee12008be22e94b03c0&=&format=webp&quality=lossless&width=394&height=394';
   
   const SidebarContainer: React.FC<{children: React.ReactNode}> = ({children}) => (
@@ -126,7 +136,9 @@ const Sidebar: React.FC<SidebarProps> = ({ activeFeature, setActiveFeature, isOp
         <SidebarContainer>
             <SidebarContent 
                 activeFeature={activeFeature} 
-                setActiveFeature={setActiveFeature} 
+                setActiveFeature={setActiveFeature}
+                isNavDisabled={isNavDisabled}
+                onMobileNav={() => {}}
             />
         </SidebarContainer>
       </aside>
@@ -147,7 +159,9 @@ const Sidebar: React.FC<SidebarProps> = ({ activeFeature, setActiveFeature, isOp
                     </div>
                     <SidebarContent 
                         activeFeature={activeFeature} 
-                        setActiveFeature={(feature) => { setActiveFeature(feature); setIsOpen(false); }} 
+                        setActiveFeature={setActiveFeature} 
+                        isNavDisabled={isNavDisabled}
+                        onMobileNav={() => setIsOpen(false)}
                     />
                  </SidebarContainer>
             </aside>
